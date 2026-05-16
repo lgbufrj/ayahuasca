@@ -1,0 +1,287 @@
+import string
+import yaml
+from rdkit import Chem
+from Bio import SeqIO
+from data import proteins, PROTEINS_PATH, compounds, COMPOUNDS_PATH
+import os
+
+# ============================================================
+# Utility functions
+# ============================================================
+
+def read_fasta_sequence(fasta_path: str) -> str:
+    """
+    Reads the first sequence from a FASTA file using Biopython.
+    """
+
+    record = next(SeqIO.parse(fasta_path, "fasta"))
+
+    return str(record.seq)
+
+
+def sdf_to_smiles(sdf_path: str) -> str:
+    """
+    Converts an SDF file to SMILES using RDKit.
+    """
+
+    mol = Chem.MolFromMolFile(sdf_path, removeHs=False)
+
+    if mol is None:
+        raise ValueError(f"Could not parse SDF: {sdf_path}")
+
+    return Chem.MolToSmiles(mol)
+
+
+def chain_generator():
+    """
+    Generates chain IDs:
+    A, B, C ... Z, AA, AB, AC ...
+    """
+
+    alphabet = string.ascii_uppercase
+
+    # Single-letter IDs
+    for letter in alphabet:
+        yield letter
+
+    # Double-letter IDs
+    for first in alphabet:
+        for second in alphabet:
+            yield first + second
+
+
+# ============================================================
+# Entity builders
+# ============================================================
+
+def build_protein_entity(
+    fasta_path: str,
+    chain_ids,
+    msa_path: str = None,
+    modifications: list = None,
+    cyclic: bool = False,
+):
+    """
+    Builds a protein entity dictionary.
+    """
+
+    sequence = read_fasta_sequence(fasta_path)
+
+    protein_dict = {
+        "id": chain_ids,
+        "sequence": sequence,
+    }
+
+    if msa_path is not None:
+        protein_dict["msa"] = msa_path
+
+    if modifications is not None:
+        protein_dict["modifications"] = modifications
+
+    if cyclic:
+        protein_dict["cyclic"] = True
+
+    return {
+        "protein": protein_dict
+    }
+
+
+def build_ligand_entity(
+    chain_id: str,
+    sdf_path: str = None,
+    smiles: str = None,
+    ccd: str = None,
+):
+    """
+    Builds a ligand entity dictionary.
+    """
+
+    provided = [
+        sdf_path is not None,
+        smiles is not None,
+        ccd is not None,
+    ]
+
+    if sum(provided) != 1:
+        raise ValueError(
+            "Provide exactly ONE of: sdf_path, smiles, or ccd"
+        )
+
+    ligand_dict = {
+        "id": chain_id,
+    }
+
+    if sdf_path is not None:
+        ligand_dict["smiles"] = sdf_to_smiles(sdf_path)
+
+    elif smiles is not None:
+        ligand_dict["smiles"] = smiles
+
+    elif ccd is not None:
+        ligand_dict["ccd"] = ccd
+
+    return {
+        "ligand": ligand_dict
+    }
+
+
+# ============================================================
+# Main generator
+# ============================================================
+
+def generate_boltz_input(
+    proteins,
+    ligands=None,
+    output_yaml="boltz_input.yaml",
+):
+    """
+    Generates a Boltz YAML input.
+
+    Parameters
+    ----------
+    proteins : list of dict
+
+        Example:
+
+        proteins = [
+            {
+                "fasta": "proteinA.fasta",
+                "copies": 2
+            },
+            {
+                "fasta": "proteinB.fasta",
+                "copies": 1
+            }
+        ]
+
+    ligands : list of dict
+
+        Example:
+
+        ligands = [
+            {
+                "sdf": "ligand.sdf"
+            },
+            {
+                "ccd": "FAD"
+            }
+        ]
+    """
+
+    chain_ids = chain_generator()
+
+    sequences = []
+
+    # ========================================================
+    # Proteins
+    # ========================================================
+
+    for protein in proteins:
+
+        fasta_path = protein["fasta"]
+
+        copies = protein.get("copies", 1)
+
+        msa_path = protein.get("msa")
+
+        modifications = protein.get("modifications")
+
+        cyclic = protein.get("cyclic", False)
+
+        protein_chain_ids = [
+            next(chain_ids)
+            for _ in range(copies)
+        ]
+
+        # Use scalar instead of list for monomers
+        if len(protein_chain_ids) == 1:
+            protein_chain_ids = protein_chain_ids[0]
+
+        entity = build_protein_entity(
+            fasta_path=fasta_path,
+            chain_ids=protein_chain_ids,
+            msa_path="empty",
+            # modifications=modifications,
+            # cyclic=cyclic,
+        )
+
+        sequences.append(entity)
+
+    # ========================================================
+    # Ligands / Cofactors
+    # ========================================================
+
+    if ligands is not None:
+
+        for ligand in ligands:
+
+            ligand_chain = next(chain_ids)
+
+            entity = build_ligand_entity(
+                chain_id=ligand_chain,
+                sdf_path=ligand.get("sdf"),
+                # smiles=ligand.get("smiles"),
+                # ccd=ligand.get("ccd"),
+            )
+
+            sequences.append(entity)
+
+    # ========================================================
+    # Final YAML
+    # ========================================================
+
+    boltz_dict = {
+        "sequences": sequences
+    }
+
+    os.makedirs(os.path.dirname(output_yaml), exist_ok=True)
+
+    with open(output_yaml, "w") as f:
+
+        yaml.dump(
+            boltz_dict,
+            f,
+            default_flow_style=False,
+            sort_keys=False,
+        )
+
+    print(f"Boltz YAML written to: {output_yaml}")
+
+
+if __name__ == "__main__":
+    
+    for protein_name, protein_data in proteins.items():
+        for reaction in protein_data["reactions"]:
+            
+            ligands = [
+                {
+                    "sdf": f"{COMPOUNDS_PATH}/{cpd}/structure/{cpd}_{compounds[cpd]['pubchem_id']}.sdf"
+                } for cpd in reaction['substrates']
+            ]
+
+            for ref_organism, organism_data in protein_data['organisms'].items():
+                
+                input_protein = [{
+                    "fasta": f"{PROTEINS_PATH}/{protein_name}/reference/{ref_organism}/structure/{protein_name}_{organism_data['uniprot_id']}.fasta",
+                    "copies": 1
+                }]
+
+                    
+                generate_boltz_input(
+                    proteins=input_protein,
+                    ligands=ligands,
+                    output_yaml=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ref_organism}/inputs/{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
+                )
+                
+                    
+                # for ooi in protein_data['oois']:
+                #     input_protein = [{
+                #         "fasta": f"{PROTEINS_PATH}/{protein_name}/analysis/genomic/blast/{ooi}/{ref_organism}/{protein_name}_{organism_data['uniprot_id']}_best_hit.fasta",
+                #         "copies": 1
+                #     }]
+
+                #     generate_boltz_input(
+                #         proteins=input_protein,
+                #         ligands=ligands,
+                #         output_yaml=f"{PROTEINS_PATH}/{protein_name}/reference/{ref_organism}/structure/{protein_name}_{organism_data['uniprot_id']}_{reaction_data['id']}.yaml"
+                #     )

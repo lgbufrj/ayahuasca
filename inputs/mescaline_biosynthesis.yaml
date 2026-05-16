@@ -1,0 +1,13 @@
+compounds:
+  mescaline:
+    name: "Mescaline"
+    pubchem_id: "4076"
+    charge: 0
+
+organisms:
+  san_pedro:
+    species: "Echinopsis pachanoi"
+    ncbi_id: "2800985"
+    ref: false
+
+proteins: {}

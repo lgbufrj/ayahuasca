@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pathway",
+  "type": "object",
+  "required": ["compounds", "organisms", "proteins"],
+  "properties": {
+    "compounds": {
+      "type": "object",
+      "additionalProperties": {"type": "object"}
+    },
+    "organisms": {
+      "type": "object",
+      "additionalProperties": {"type": "object"}
+    },
+    "proteins": {
+      "type": "object",
+      "additionalProperties": {"type": "object"}
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,44 @@
+Alinhamento:
+
+Passo 0: BLAST
+    - Criar um banco de dados para o BLAST a partir do FASTA com as sequencias
+        makeblastdb -in genome.cds_maririT.fasta -dbtype nucl -out cds_database
+    - Pesquisar no banco
+        blastp -query imine_reductase.fasta -db "prot_database" -out imine_search.out
+        blastn -query imine_reductase_cds.fasta -db "cds_database" -out imine_cds_search.out
+        *Caso queira que arquivo retorne em XML
+        blastp -query imine_reductase.fasta -db "prot_database" -out imine_search.out -outfmt 5
+        blastn -query imine_reductase_cds.fasta -db "cds_database" -out imine_cds_search.out -outfmt 5
+
+Passo 1. BLAST
+    - Plataforma do NCBI (blastp = blast de ptns)
+    https://blast.ncbi.nlm.nih.gov/Blast.cgi?PROGRAM=blastp&PAGE_TYPE=BlastSearch&LINK_LOC=blasthome
+
+Passo x. Extrair Seqs (algoritmo do chico)
+    - Criar lista de IDs das sequencias em um arquivo .txt
+    - Ir até a pasta /MSAs/scripts e rodar:
+    perl get_seq_by_acc.pl {caminho/ate/genome.prots_maririT.fasta} {caminho/ate/arquivo_ids}.txt > {caminho/ate/arquivo_resultado}.fasta
+    perl get_seq_by_acc.pl ../../genome.prots_maririT.fasta ../../Structure/strctosidine/strico12 > stricto_12.fasta
+
+Passo x+1. Alinhamento
+    [algoritmo] -in {arquivo_de_sequencias}.fasta -out {arquivo_alinhado}.fasta
+    Ex.: muscle -in stricto_12.fasta -out stricto_12_msa.fasta
+    Ex.: mafft stricto_12.fasta > stricto_12_msa.fasta
+
+Documentação biopython
+    Biopython (documentacao do modulo do BLAST)
+        https://biopython.org/docs/latest/Tutorial/chapter_blast.html
+    
+    Documetnacao geral do BioPython:
+        https://biopython.org/wiki/Documentation 
+    
+    Documentacao do módulo de sequência:
+        https://biopython.org/docs/latest/Tutorial/chapter_seq_objects.html
+
+    Documentacao de input e output (lidar com FASTA)
+        https://biopython.org/docs/latest/Tutorial/chapter_seqio.html# 
+
+
+
+Meeko: https://meeko.readthedocs.io/en/release-doc/lig_prep_basic.html
+RDKit: https://www.rdkit.org/docs/GettingStartedInPython.html

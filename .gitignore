@@ -1,0 +1,4 @@
+/pathways
+/scripts/.venv
+/scripts/__pycache__/
+*.pyc

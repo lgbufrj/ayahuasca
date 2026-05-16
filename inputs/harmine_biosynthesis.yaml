@@ -1,0 +1,343 @@
+compounds:
+  secologanin:
+    name: "Secologanin"
+    pubchem_id: "161276"
+    charge: 0
+  strictosidine:
+    name: "Strictosidine"
+    pubchem_id: "161336"
+    charge: 0
+  p2c:
+    name: "Δ1-piperideine-2-carboxylic acid"
+    pubchem_id: "1194"
+    charge: 0
+  pip:
+    name: "Pipecolic acid"
+    pubchem_id: "849"
+    charge: 0
+  serotonin:
+    name: "Serotonin"
+    pubchem_id: "5202"
+    charge: 0
+  nas:
+    name: "N-Acetylserotonin"
+    pubchem_id: "903"
+    charge: 0
+  melatonin:
+    name: "Melatonin"
+    pubchem_id: "896"
+    charge: 0
+  iaa:
+    name: "Indole-3-acetic acid"
+    pubchem_id: "802"
+    charge: 0
+  3moxi:
+    name: "3-Methyleneoxindole"
+    pubchem_id: "150946"
+    charge: 0
+  sam:
+    name: "SAM"
+    pubchem_id: "34755"
+    charge: 0
+  sah:
+    name: "SAH"
+    pubchem_id: "439155"
+    charge: 0
+  tryptophan:
+    name: "Tryptophan"
+    pubchem_id: "6305"
+    charge: 0
+  tryptamine:
+    name: "Tryptamine"
+    pubchem_id: "1150"
+    charge: 0
+  acetaldehyde:
+    name: "Acetaldehyde"
+    pubchem_id: "177"
+    charge: 0
+  tetrahydroharman:
+    name: "Tetrahydroharman"
+    pubchem_id: "91522"
+    charge: 0
+  tetrahydroharmol:
+    name: "Tetrahydroharmol"
+    pubchem_id: "368982"
+    charge: 0
+  tetrahydroharmine:
+    name: "Tetrahydroharmine"
+    pubchem_id: "442118"
+    charge: 0
+  harmalan:
+    name: "Harmalan"
+    pubchem_id: "160510"
+    charge: 0
+  harmalol:
+    name: "Harmalol"
+    pubchem_id: "3565"
+    charge: 0
+  harmaline:
+    name: "Harmaline"
+    pubchem_id: "3564"
+    charge: 0
+  harman:
+    name: "Harman"
+    pubchem_id: "5281404"
+    charge: 0
+  harmol:
+    name: "Harmol"
+    pubchem_id: "68094"
+    charge: 0
+  harmine:
+    name: "Harmine"
+    pubchem_id: "5280953"
+    charge: 0
+  water:
+    name: "H₂O"
+    pubchem_id: "962"
+    charge: 0
+  h2o2:
+    name: "H₂O₂"
+    pubchem_id: "784"
+    charge: 0
+  co2:
+    name: "CO₂"
+    pubchem_id: "280"
+    charge: 0
+  "h+":
+    name: "H⁺"
+    pubchem_id: "5460653"
+    charge: 1
+  "nadp+":
+    name: "NAD⁺"
+    pubchem_id: "5886"
+    charge: 1
+  nadph:
+    name: "NADPH"
+    pubchem_id: "5884"
+    charge: 0
+
+organisms:
+  tucunaca:
+    species: "Banisteriopsis caapi Tucunaca"
+    ncbi_id: "577683"
+    ref: false
+    genome_files:
+      prot:
+        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.gene.gz"
+        compressed: true
+        phased: true
+        final_format: "fasta"
+        download: false
+  caupuri:
+    species: "Banisteriopsis caapi Caupuri"
+    ncbi_id: "577683"
+    ref: false
+    genome_files:
+      prot:
+        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.gene.gz"
+        compressed: true
+        phased: true
+        final_format: "fasta"
+        download: false
+  arabidopsis:
+    species: "Arabidopsis thaliana"
+    ncbi_id: "3702"
+    ref: true
+  rice:
+    species: "Oryza sativa subs. japonica"
+    ncbi_id: "39947"
+    ref: true
+  catharanthus:
+    species: "Catharanthus roseus"
+    ncbi_id: "4058"
+    ref: true
+  tabaco:
+    species: "Nicotiana tabacum"
+    ncbi_id: "4097"
+    ref: true
+
+proteins:
+  tdc:
+    ec_number: ""
+    gene_name: "tdc"
+    abbreviation: "TDC"
+    name: "Tryptophan decarboxylase"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      rice:
+        uniprot_id: "Q6ZJK7"
+        rcsb_id: "6KHO"
+      catharanthus:
+        uniprot_id: "P17770"
+        rcsb_id: "6EEW"
+      tabaco:
+        uniprot_id: "UPI0007B99C92"
+        rcsb_id: null
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["tryptophan"]
+        products: ["tryptamine", "co2"]
+      - id: "r1"
+        ref: false
+        substrates: ["tryptophan"]
+        products: ["tryptamine", "co2"]
+    cofactors: null
+    compartment: "cytoplasm"
+
+  stricto:
+    ec_number: ""
+    gene_name: "str"
+    abbreviation: "STS"
+    name: "Strictosidine synthase"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      arabidopsis:
+        uniprot_id: "P94111"
+      catharanthus:
+        uniprot_id: "P18417"
+        rcsb_id: "6ZEA"
+      tabaco:
+        uniprot_id: "A0A1U7VHK2"
+        rcsb_id: null
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["tryptamine", "secologanin"]
+        products: ["strictosidine", "water"]
+      - id: "r1"
+        ref: false
+        substrates: ["tryptamine", "acetaldehyde"]
+        products: ["tetrahydroharman", "water"]
+    cofactors: null
+    compartment: "vacuole"
+
+  sard4:
+    ec_number: ""
+    gene_name: "sard4"
+    abbreviation: "SARD4"
+    name: "SAR DEFICIENT 4"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      arabidopsis:
+        uniprot_id: "Q9FLY0"
+      tabaco:
+        uniprot_id: "UPI00051C198A"
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["p2c", "nadph", "h+"]
+        products: ["pip", "nadp+"]
+      - id: "r1"
+        ref: false
+        substrates: ["tetrahydroharmol", "nadp+"]
+        products: ["harmalol", "nadph", "h+"]
+      - id: "r2"
+        ref: false
+        substrates: ["tetrahydroharman", "nadp+"]
+        products: ["harmalan", "nadph", "h+"]
+      - id: "r3"
+        ref: false
+        substrates: ["tetrahydroharmine", "nadp+"]
+        products: ["harmaline", "nadph", "h+"]
+    cofactors: ["nadp+"]
+    compartment: "cytoplasm"
+
+  t5h:
+    ec_number: ""
+    gene_name: "t5h"
+    abbreviation: "T5H"
+    name: "Tryptamine 5-hydroxylase"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      rice:
+        uniprot_id: "Q2QUC5"
+      tabaco:
+        uniprot_id: "UPI000520826B"
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["tryptamine"]
+        products: ["serotonin"]
+      - id: "r1"
+        ref: false
+        substrates: ["tetrahydroharman"]
+        products: ["tetrahydroharmol"]
+      - id: "r2"
+        ref: false
+        substrates: ["harman"]
+        products: ["harmol"]
+      - id: "r3"
+        ref: false
+        substrates: ["harmalan"]
+        products: ["harmalol"]
+    cofactors: ["nadph"]
+    compartment: "cytoplasm"
+
+  asmt:
+    ec_number: "2.1.1.4"
+    gene_name: "asmt"
+    abbreviation: "ASMT"
+    name: "N-Acetylserotonin O-methyltransferase"
+    oligomerization: "homodimer"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      arabidopsis:
+        uniprot_id: "Q9T003"
+      rice:
+        uniprot_id: "Q6EPG8"
+      tabaco:
+        uniprot_id: "UPI00051AFCC8"
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["nas", "sam"]
+        products: ["melatonin", "sah", "h+"]
+      - id: "r1"
+        ref: false
+        substrates: ["tetrahydroharmol", "sam"]
+        products: ["tetrahydroharmine", "sah", "h+"]
+      - id: "r2"
+        ref: false
+        substrates: ["harmalol", "sam"]
+        products: ["harmaline", "sah", "h+"]
+      - id: "r3"
+        ref: false
+        substrates: ["harmol", "sam"]
+        products: ["harmine", "sah", "h+"]
+    cofactors: ["sam"]
+    compartment: "cytoplasm"
+
+  peroxidase:
+    ec_number: ""
+    gene_name: "peroxidase"
+    abbreviation: "POX"
+    name: "Peroxidase"
+    oois: ["tucunaca", "caupuri"]
+    organisms:
+      arabidopsis:
+        uniprot_id: "Q39034"
+        rcsb: "1QGJ"
+      rice:
+        uniprot_id: "P37834"
+      catharanthus:
+        uniprot_id: "A0A0B7JH45"
+    reactions:
+      - id: "rr"
+        ref: true
+        substrates: ["iaa", "h2o2"]
+        products: ["3moxi", "water", "water"]
+      - id: "r1"
+        ref: false
+        substrates: ["harmalan", "h2o2"]
+        products: ["harman", "water", "water"]
+      - id: "r2"
+        ref: false
+        substrates: ["harmalol", "h2o2"]
+        products: ["harmol", "water", "water"]
+      - id: "r3"
+        ref: false
+        substrates: ["harmaline", "h2o2"]
+        products: ["harmine", "water", "water"]
+    cofactors: ["heme"]
+    compartment: "cytoplasm"

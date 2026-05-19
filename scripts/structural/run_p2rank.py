@@ -62,7 +62,7 @@ def generate_docking_grid(input_file, prediction_output_path, final_output_file)
 
 if __name__ == "__main__":
     
-    protein = "stricto"
+    protein = "asmt"
 
     protein_data = proteins[protein]
 

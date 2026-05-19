@@ -1,8 +1,7 @@
-# import MDAnalysis as mda
-# from MDAnalysis.analysis import align, rms
 import os, subprocess
 from data import proteins, PROTEINS_PATH
 import re
+import pandas as pd
 
 USALIGN_PATH = "/home/pedro/Desktop/Programas/USalign/USalign"
 
@@ -31,12 +30,14 @@ if __name__ == "__main__":
     
     for protein, protein_data in proteins.items():
         
+        results = []
+        
         for ooi in protein_data["oois"]:
         
-            mobile_pdb = PROTEINS_PATH + f"/{protein}/analysis/structural/alphafold/{ooi}/best_model.pdb"
+            ooi_pdb = PROTEINS_PATH + f"/{protein}/analysis/structural/alphafold/{ooi}/best_model.pdb"
         
-            if not os.path.exists(mobile_pdb):
-                # print(f"Mobile PDB not found for {protein} ({ooi}): {mobile_pdb}")
+            if not os.path.exists(ooi_pdb):
+                # print(f"Mobile PDB not found for {protein} ({ooi}): {ooi_pdb}")
                 continue
         
             for organism, organism_data in protein_data['organisms'].items():
@@ -47,12 +48,22 @@ if __name__ == "__main__":
                     # print(f"Reference PDB not found for {protein} ({organism}): {reference_pdb}")
                     continue
 
-                alignment = usalign(reference_pdb, mobile_pdb)
+                alignment = usalign(reference_pdb, ooi_pdb)
 
-                print(f"RMSD for {protein} ({ooi} x {organism}): {alignment['rmsd']}\nTM-score for {protein} ({ooi} x {organism}): {alignment['tm_score']}")
+                # print(f"RMSD for {protein} ({ooi} x {organism}): {alignment['rmsd']}\nTM-score for {protein} ({ooi} x {organism}): {alignment['tm_score']}")
+    
+                results.append({
+                    "protein": protein,
+                    "ooi": ooi,
+                    "reference_organism": organism,
+                    "rmsd": alignment['rmsd'],
+                    "tm_score": alignment['tm_score']
+                })
 
-                # results.append({
-                #     "protein": protein,
-                #     "organism": organism,
-                #     "rmsd": rmsd
-                # })
+        # Save results to a CSV
+        output_path = PROTEINS_PATH + f"/{protein}/analysis/structural/alignment"
+        os.makedirs(output_path, exist_ok=True)
+        df = pd.DataFrame(results)
+        df.to_csv(f"{output_path}/structural_alignments.csv", index=False)
+
+        print(f"Results saved to {protein} | structural_alignments.csv")

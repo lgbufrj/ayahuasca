@@ -182,7 +182,7 @@ proteins:
         ref: false
         substrates: ["tryptophan"]
         products: ["tryptamine", "co2"]
-    cofactors: null
+    cofactors: []
     compartment: "cytoplasm"
 
   stricto:
@@ -209,7 +209,7 @@ proteins:
         ref: false
         substrates: ["tryptamine", "acetaldehyde"]
         products: ["tetrahydroharman", "water"]
-    cofactors: null
+    cofactors: ["tryptamine"]
     compartment: "vacuole"
 
   sard4:

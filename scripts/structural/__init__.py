@@ -1,0 +1,1 @@
+print("Structural module!")

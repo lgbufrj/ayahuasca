@@ -4,6 +4,7 @@ from rdkit import Chem
 from Bio import SeqIO
 from data import proteins, PROTEINS_PATH, compounds, COMPOUNDS_PATH
 import os
+import pandas as pd
 
 # ============================================================
 # Utility functions
@@ -55,8 +56,9 @@ def chain_generator():
 # ============================================================
 
 def build_protein_entity(
-    fasta_path: str,
     chain_ids,
+    fasta_path: str = None,
+    sequence: str = None,
     msa_path: str = None,
     modifications: list = None,
     cyclic: bool = False,
@@ -65,7 +67,10 @@ def build_protein_entity(
     Builds a protein entity dictionary.
     """
 
-    sequence = read_fasta_sequence(fasta_path)
+    if sequence is None and fasta_path is not None:
+        sequence = read_fasta_sequence(fasta_path)
+    elif sequence is None:
+        raise ValueError("Provide either fasta_path or sequence")
 
     protein_dict = {
         "id": chain_ids,
@@ -178,7 +183,11 @@ def generate_boltz_input(
 
     for protein in proteins:
 
-        fasta_path = protein["fasta"]
+        fasta_path = protein.get("fasta")
+        
+        if(fasta_path is not None):
+            if not os.path.isfile(fasta_path):
+                continue
 
         copies = protein.get("copies", 1)
 
@@ -198,11 +207,10 @@ def generate_boltz_input(
             protein_chain_ids = protein_chain_ids[0]
 
         entity = build_protein_entity(
-            fasta_path=fasta_path,
+            fasta_path=protein.get("fasta"),
+            sequence=protein.get("sequence"),
             chain_ids=protein_chain_ids,
             msa_path="empty",
-            # modifications=modifications,
-            # cyclic=cyclic,
         )
 
         sequences.append(entity)
@@ -247,6 +255,21 @@ def generate_boltz_input(
 
     print(f"Boltz YAML written to: {output_yaml}")
 
+def get_best_hit_fasta_sequence(blast_csv_path: str, blast_fasta_path: str) -> str:
+    """
+    Reads the best hit sequence ID from the first row of the BLAST CSV
+    and extracts the matching sequence from the multifasta file.
+    """
+    if not os.path.isfile(blast_csv_path):
+        return None
+    df = pd.read_csv(blast_csv_path, sep=";")
+    best_hit_id = str(df.iloc[0]["hit_id"])
+
+    for record in SeqIO.parse(blast_fasta_path, "fasta"):
+        if record.id == best_hit_id:
+            return str(record.seq)
+
+    # raise ValueError(f"Best hit ID '{best_hit_id}' not found in {blast_fasta_path}")
 
 if __name__ == "__main__":
     
@@ -272,16 +295,24 @@ if __name__ == "__main__":
                     ligands=ligands,
                     output_yaml=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ref_organism}/inputs/{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
                 )
-                
                     
-                # for ooi in protein_data['oois']:
-                #     input_protein = [{
-                #         "fasta": f"{PROTEINS_PATH}/{protein_name}/analysis/genomic/blast/{ooi}/{ref_organism}/{protein_name}_{organism_data['uniprot_id']}_best_hit.fasta",
-                #         "copies": 1
-                #     }]
+                for ooi in protein_data['oois']:
+                    blast_csv  = f"{PROTEINS_PATH}/{protein_name}/analysis/genomic/blast/{ooi}/{ref_organism}/{protein_name}_{organism_data['uniprot_id']}_blast_filtered.csv"
+                    blast_fasta = f"{PROTEINS_PATH}/{protein_name}/analysis/genomic/blast/{ooi}/{ref_organism}/{protein_name}_{organism_data['uniprot_id']}_blast_filtered.fasta"
 
-                #     generate_boltz_input(
-                #         proteins=input_protein,
-                #         ligands=ligands,
-                #         output_yaml=f"{PROTEINS_PATH}/{protein_name}/reference/{ref_organism}/structure/{protein_name}_{organism_data['uniprot_id']}_{reaction_data['id']}.yaml"
-                #     )
+                    best_hit_seq = get_best_hit_fasta_sequence(blast_csv, blast_fasta)
+                    
+                    if not best_hit_seq:
+                        print(f"No valid best hit found for {protein_name} in {ref_organism} with OOI {ooi}. Skipping Boltz input generation.")
+                        continue
+
+                    input_protein = [{
+                        "sequence": best_hit_seq,   # pass sequence directly
+                        "copies": 1
+                    }]
+
+                    generate_boltz_input(
+                        proteins=input_protein,
+                        ligands=ligands,
+                        output_yaml=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ooi}/{ref_organism}/inputs/{protein_name}_{ooi}_{ref_organism}_{reaction['id']}.yaml"
+                    )

@@ -1,50 +1,48 @@
 compounds:
   yuremamine:
-    name: "Yuremamine"
-    pubchem_id: "102516368"
+    name: Yuremamine
+    pubchem_id: '102516368'
     charge: 0
   dmt:
-    name: "DMT"
-    pubchem_id: "6089"
+    name: DMT
+    pubchem_id: '6089'
     charge: 0
   gallocatechin:
-    name: "Gallocatechin"
-    pubchem_id: "65084"
+    name: Gallocatechin
+    pubchem_id: '65084'
     charge: 0
-
 organisms:
   yurema:
-    species: "Mimosa tenuiflora"
-    ncbi_id: "138060"
+    species: Mimosa tenuiflora
+    ncbi_id: '138060'
     ref: false
     genome_files:
       genes:
-        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.gene.gz"
+        url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.gene.gz
         compressed: true
         phased: false
-        final_format: "fasta"
+        final_format: fasta
         download: false
       cds:
-        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.cds.gz"
+        url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.cds.gz
         compressed: true
         phased: false
-        final_format: "fasta"
+        final_format: fasta
         download: true
       prot:
-        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.faa.gz"
+        url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.faa.gz
         compressed: true
         phased: false
-        final_format: "fasta"
+        final_format: fasta
         download: true
       rnaseq_short:
-        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam1.bam"
+        url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam1.bam
         compressed: false
-        final_format: "bam"
+        final_format: bam
         download: false
       rnaseq_long:
-        url: "https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam2.bam"
+        url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam2.bam
         compressed: false
-        final_format: "bam"
+        final_format: bam
         download: false
-
 proteins: {}

@@ -1,37 +1,193 @@
-import os
+"""
+download_sdf.py
+─────────────────────────────────────────────────────────────────────────────
+Downloads PubChem SDF files for every compound in data.compounds.
+Tries 3D first; falls back to 2D if unavailable.
+Skips compounds whose SDF already exists on disk.
+
+Usage
+    python download_sdf.py                    # all compounds
+    python download_sdf.py --compound sam     # single compound
+    python download_sdf.py --force            # re-download existing files
+─────────────────────────────────────────────────────────────────────────────
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import time
+from pathlib import Path
+
 import requests
-# import pubchempy as pcp
-from data import pathways, compounds, databases, COMPOUNDS_PATH
 
-FILE_PATH = "{COMPOUNDS_PATH}/{cname}/structure/{cname}_{cid}.sdf"
+import data
+from logger import build_logger
 
-def download_sdf(cid, file_path, record_type="3d"):
-    url = f"{databases['pubchem']['url']}/rest/pug/compound/cid/{cid}/SDF?record_type={record_type}"
-    response = requests.get(url)
-    response.raise_for_status()  # raise error if request failed
-    with open(file_path, "wb") as f:
-        f.write(response.content)
+log = build_logger("download_sdf")
 
-for cname, cdata in compounds.items():
-    cid = cdata["pubchem_id"]
-    file_path = FILE_PATH.format(COMPOUNDS_PATH=COMPOUNDS_PATH, cname=cname, cid=cid)
-    
-    # Skip if file already exists
-    if os.path.exists(file_path):
-        print(f"SDF file already exists for {cname} (CID: {cid}), skipping...")
-        continue
+# ──────────────────────────────────────────────────────────────────────────────
+# Constants
+# ──────────────────────────────────────────────────────────────────────────────
 
-    # make sure folder exists
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+PUBCHEM_URL  = data.databases["pubchem"]["url"]
+RETRY_DELAY  = 2      # seconds between retries
+MAX_RETRIES  = 3
+RECORD_TYPES = ("3d", "2d")   # preference order
 
-    try:
-        download_sdf(cid, file_path)
-        print(f"Downloaded 3D {cname} (CID: {cid}) to {file_path}")
-    except Exception as e:
-        print(f"Error downloading 3D {cname} (CID: {cid}): {e}")
-        print(f"Trying to download 2D {cname} (CID: {cid})...")
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Paths
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _sdf_path(compound_key: str, pubchem_id: str | int) -> Path:
+    return (
+        Path(data.COMPOUNDS_PATH)
+        / compound_key / "structure"
+        / f"{compound_key}_{pubchem_id}.sdf"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Download
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _fetch_sdf(cid: str | int, record_type: str) -> bytes:
+    """
+    Fetch SDF bytes from PubChem. Retries on transient errors.
+    Raises requests.HTTPError on a final failure.
+    """
+    url = (
+        f"{PUBCHEM_URL}/rest/pug/compound/cid/{cid}/SDF"
+        f"?record_type={record_type}"
+    )
+
+    for attempt in range(1, MAX_RETRIES + 1):
         try:
-            download_sdf(cid, file_path, record_type="2d")
-            print(f"Downloaded 2D {cname} (CID: {cid}) to {file_path}")
-        except Exception as e:
-            print(f"Error downloading 2D {cname} (CID: {cid}): {e}")
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            return response.content
+        except requests.HTTPError as exc:
+            # 404 means this record type genuinely doesn't exist — don't retry
+            if exc.response is not None and exc.response.status_code == 404:
+                raise
+            if attempt < MAX_RETRIES:
+                log.warning(
+                    "attempt %d/%d failed for CID %s (%s): %s — retrying in %ds",
+                    attempt, MAX_RETRIES, cid, record_type, exc, RETRY_DELAY,
+                )
+                time.sleep(RETRY_DELAY * attempt)
+            else:
+                raise
+        except requests.RequestException as exc:
+            if attempt < MAX_RETRIES:
+                log.warning(
+                    "attempt %d/%d failed for CID %s (%s): %s — retrying in %ds",
+                    attempt, MAX_RETRIES, cid, record_type, exc, RETRY_DELAY,
+                )
+                time.sleep(RETRY_DELAY * attempt)
+            else:
+                raise
+
+    raise RuntimeError("unreachable")   # pragma: no cover
+
+
+def download_compound(
+    compound_key: str,
+    *,
+    force: bool = False,
+) -> bool:
+    """
+    Download the SDF for *compound_key*. Returns True on success.
+    Tries 3D first, falls back to 2D.
+    """
+    cdata      = data.compounds[compound_key]
+    pubchem_id = cdata["pubchem_id"]
+    dest       = _sdf_path(compound_key, pubchem_id)
+
+    if dest.exists() and not force:
+        log.info("skip  %s (CID %s) — file exists", compound_key, pubchem_id)
+        return True
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    for record_type in RECORD_TYPES:
+        try:
+            log.info("fetch %s (CID %s) [%s]…", compound_key, pubchem_id, record_type)
+            content = _fetch_sdf(pubchem_id, record_type)
+            dest.write_bytes(content)
+            log.info("saved %s → %s", compound_key, dest)
+            return True
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else "?"
+            if status == 404:
+                log.warning(
+                    "%s (CID %s): no %s structure on PubChem, trying next…",
+                    compound_key, pubchem_id, record_type,
+                )
+            else:
+                log.error(
+                    "%s (CID %s) [%s]: HTTP %s — %s",
+                    compound_key, pubchem_id, record_type, status, exc,
+                )
+                return False
+        except Exception as exc:
+            log.error(
+                "%s (CID %s) [%s]: %s",
+                compound_key, pubchem_id, record_type, exc,
+            )
+            return False
+
+    log.error("%s (CID %s): no structure available (tried %s)", compound_key, pubchem_id, ", ".join(RECORD_TYPES))
+    return False
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CLI
+# ──────────────────────────────────────────────────────────────────────────────
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Download PubChem SDF files for all compounds.",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument(
+        "--compound", "-c",
+        help="Single compound key to download (default: all)",
+    )
+    p.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Re-download even if the SDF already exists",
+    )
+    p.add_argument("--verbose", "-v", action="store_true")
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    import logging
+    args = parse_args(argv)
+
+    if args.verbose:
+        log.setLevel(logging.DEBUG)
+
+    targets = [args.compound] if args.compound else list(data.compounds.keys())
+
+    failed = []
+    for key in targets:
+        if key not in data.compounds:
+            log.error("Unknown compound key: %s", key)
+            return 1
+        if not download_compound(key, force=args.force):
+            failed.append(key)
+
+    if failed:
+        log.error("Failed downloads: %s", ", ".join(failed))
+        return 1
+
+    log.info("All done.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

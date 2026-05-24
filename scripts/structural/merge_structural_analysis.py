@@ -53,6 +53,13 @@ def _docking_path(protein: str) -> Path:
         / protein / "analysis" / "structural" / "vina"
         / "docking_results.csv"
     )
+    
+def _boltz_path(protein: str) -> Path:
+    return (
+        Path(data.PROTEINS_PATH)
+        / protein / "analysis" / "structural" / "boltz"
+        / "boltz_results.csv"
+    )
 
 def _alignment_path(protein: str) -> Path:
     return (

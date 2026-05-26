@@ -1,13 +1,24 @@
 import logging
 import sys
 
-RESET  = "\033[0m"
-BOLD   = "\033[1m"
-GREEN  = "\033[32m"
-YELLOW = "\033[33m"
-RED    = "\033[31m"
-CYAN   = "\033[36m"
-GREY   = "\033[90m"
+COLORS = {
+    "RESET": "\033[0m",
+    "BOLD":  "\033[1m",
+    "GREEN": "\033[32m",
+    "YELLOW":"\033[33m",
+    "RED":   "\033[31m",
+    "CYAN":  "\033[36m",
+    "GREY":  "\033[90m",
+}
+
+# Backwards-compatible aliases
+RESET  = COLORS["RESET"]
+BOLD   = COLORS["BOLD"]
+GREEN  = COLORS["GREEN"]
+YELLOW = COLORS["YELLOW"]
+RED    = COLORS["RED"]
+CYAN   = COLORS["CYAN"]
+GREY   = COLORS["GREY"]
 
 LEVEL_COLOURS = {
     logging.DEBUG:    GREY,

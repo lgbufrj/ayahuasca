@@ -29,13 +29,21 @@ from pathlib import Path
 from typing import Iterator
 
 from data import GENOME_PATH, PROTEINS_PATH, organisms, proteins
-from logger import build_logger
+from logger import build_logger, COLORS
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────────────────────────────────────
 
 log = build_logger("blastp")
+
+RESET  = COLORS["RESET"]
+BOLD   = COLORS["BOLD"]
+GREEN  = COLORS["GREEN"]
+YELLOW = COLORS["YELLOW"]
+RED    = COLORS["RED"]
+CYAN   = COLORS["CYAN"]
+GREY   = COLORS["GREY"]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Data model
@@ -234,7 +242,7 @@ def run_all(
 
     log.info(
         "%s%s total jobs%s — workers=%d  dry_run=%s",
-        BOLD, len(jobs), RESET, workers, dry_run,
+        COLORS['BOLD'], len(jobs), COLORS['RESET'], workers, dry_run,
     )
 
     completed: list[BlastJob] = []

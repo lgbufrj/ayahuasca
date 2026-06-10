@@ -42,6 +42,11 @@ run_dir = client.experiments.run_structure_and_binding(
     ],
     model="boltz-2.1",
     name="asmt_tucunaca_tabaco_rr",
+    properties={
+        "affinity": {
+            "binder": "B"
+        }   
+    }
 )
 
 print(run_dir)

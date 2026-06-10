@@ -239,8 +239,16 @@ def generate_boltz_input(
     # ========================================================
 
     boltz_dict = {
+        "version": 1,
         "sequences": sequences
     }
+    
+    # Add affinity property pointing to the first ligand's chain ID
+    if ligands is not None and len(ligands) > 0:
+        first_ligand_chain = sequences[len(proteins)]["ligand"]["id"]
+        boltz_dict["properties"] = [
+            {"affinity": {"binder": first_ligand_chain}}
+        ]
 
     os.makedirs(os.path.dirname(output_yaml), exist_ok=True)
 
@@ -288,12 +296,15 @@ if __name__ == "__main__":
                     "fasta": f"{PROTEINS_PATH}/{protein_name}/reference/{ref_organism}/structure/{protein_name}_{organism_data['uniprot_id']}.fasta",
                     "copies": 1
                 }]
+                
 
+                output_file = f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ref_organism}/inputs/{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
+                # output_file = f"./ayahusca_boltz_inputs/{ref_organism}_{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
                     
                 generate_boltz_input(
                     proteins=input_protein,
                     ligands=ligands,
-                    output_yaml=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ref_organism}/inputs/{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
+                    output_yaml=output_file
                 )
                     
                 for ooi in protein_data['oois']:
@@ -310,9 +321,12 @@ if __name__ == "__main__":
                         "sequence": best_hit_seq,   # pass sequence directly
                         "copies": 1
                     }]
+                    
+                    output_file=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ooi}/{ref_organism}/inputs/{protein_name}_{ooi}_{ref_organism}_{reaction['id']}.yaml"
+                    # output_file = f"./ayahusca_boltz_inputs/{ooi}_{ref_organism}_{protein_name}_{organism_data['uniprot_id']}_{reaction['id']}.yaml"
 
                     generate_boltz_input(
                         proteins=input_protein,
                         ligands=ligands,
-                        output_yaml=f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz/{ooi}/{ref_organism}/inputs/{protein_name}_{ooi}_{ref_organism}_{reaction['id']}.yaml"
+                        output_yaml=output_file
                     )

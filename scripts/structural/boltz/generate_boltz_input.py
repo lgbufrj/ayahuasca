@@ -282,6 +282,7 @@ def get_best_hit_fasta_sequence(blast_csv_path: str, blast_fasta_path: str) -> s
 if __name__ == "__main__":
     
     for protein_name, protein_data in proteins.items():
+        # if protein_name not in ["t5h"]: continue
         for reaction in protein_data["reactions"]:
             
             ligands = [

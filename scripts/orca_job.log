@@ -1,0 +1,41 @@
+nohup: ignoring input
+[20:21:48] Skipping secologanin, already has                     run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping strictosidine, already has                   run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping p2c, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping pip, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping serotonin, already has g_minus_eel_kcalpmol  run_orca.py:131
+           Skipping nas, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping melatonin, already has g_minus_eel_kcalpmol  run_orca.py:131
+           Skipping iaa, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping 3moxi, already has g_minus_eel_kcalpmol      run_orca.py:131
+           Skipping sam, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping sah, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Skipping tryptophan, already has g_minus_eel_kcalpmol run_orca.py:131
+           Skipping tryptamine, already has g_minus_eel_kcalpmol run_orca.py:131
+           Skipping acetaldehyde, already has                    run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping tetrahydroharman, already has                run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping tetrahydroharmol, already has                run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping tetrahydroharmine, already has               run_orca.py:131
+           g_minus_eel_kcalpmol                                                 
+           Skipping harmalan, already has g_minus_eel_kcalpmol   run_orca.py:131
+           Skipping harmalol, already has g_minus_eel_kcalpmol   run_orca.py:131
+           Skipping harmaline, already has g_minus_eel_kcalpmol  run_orca.py:131
+           Skipping harman, already has g_minus_eel_kcalpmol     run_orca.py:131
+           Skipping harmol, already has g_minus_eel_kcalpmol     run_orca.py:131
+           Skipping harmine, already has g_minus_eel_kcalpmol    run_orca.py:131
+           Skipping water, already has g_minus_eel_kcalpmol      run_orca.py:131
+           Skipping h2o2, already has g_minus_eel_kcalpmol       run_orca.py:131
+           Skipping co2, already has g_minus_eel_kcalpmol        run_orca.py:131
+           Starting ORCA job for o2 (977)                         run_orca.py:78
+⠏ ORCA finished
+[20:22:25] Finished o2. Output saved to                          run_orca.py:105
+           /home/pedro/Desktop/projects/ayahuasca/pathways/harmi                
+           ne_biosynthesis/compounds/o2/quantum/o2_977.out                      
+           Skipping h+, already has g_minus_eel_kcalpmol         run_orca.py:131
+           Skipping nadp+, already has g_minus_eel_kcalpmol      run_orca.py:131
+           Skipping nadph, already has g_minus_eel_kcalpmol      run_orca.py:131

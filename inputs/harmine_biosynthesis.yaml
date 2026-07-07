@@ -103,6 +103,10 @@ compounds:
     name: "CO\u2082"
     pubchem_id: '280'
     charge: 0
+  o2:
+    name: "O\u2082"
+    pubchem_id: '977'
+    charge: 0
   h+:
     name: "H\u207A"
     pubchem_id: '5460653'
@@ -306,8 +310,12 @@ proteins:
       ref: true
       substrates:
       - tryptamine
+      - o2
+      - nadph
       products:
       - serotonin
+      - water
+      - nadp+
       smiles: '[H]c1c([H])c([H])c2c(c1[H])c(C([H])([H])C([H])([H])N([H])[H])c([H])n2[H]>>[H]Oc1c([H])c([H])c2c(c1[H])c(C([H])([H])C([H])([H])N([H])[H])c([H])n2[H]'
     - id: r1
       ref: false

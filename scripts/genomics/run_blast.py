@@ -64,6 +64,7 @@ class BlastJob:
     ref_species: str
     fasta_name:  str
     organism:    str
+    genome_type: str
     query_path:  Path
     db_path:     Path
     out_path:    Path
@@ -100,14 +101,19 @@ def _target_organisms() -> list[str]:
     ]
 
 
-def _db_path(organism: str) -> Path:
+def _db_path(organism: str, genome_type: str) -> Path:
     meta = organisms[organism]
-    if meta["genome_files"]["prot"]["phased"]:
+    if genome_type == "phased":
+        if not meta.get("genome_files", {}).get("prot", {}).get("phased"):
+            raise ValueError(
+                f"Organism '{organism}' has no phased genome. "
+                f"Use --genome-type non_phased."
+            )
         return Path(GENOME_PATH) / organism / "phased"     / "blast" / "prot_phased_db"
     return     Path(GENOME_PATH) / organism / "non_phased" / "blast" / "prot_non_phased_db"
 
 
-def discover_jobs() -> list[BlastJob]:
+def discover_jobs(*, genome_type: str = "phased") -> list[BlastJob]:
     """Build the full list of BLASTP jobs from the data dictionaries."""
     jobs: list[BlastJob] = []
 
@@ -132,8 +138,9 @@ def discover_jobs() -> list[BlastJob]:
                     ref_species = species,
                     fasta_name  = fasta_name,
                     organism    = organism,
+                    genome_type = genome_type,
                     query_path  = query_path,
-                    db_path     = _db_path(organism),
+                    db_path     = _db_path(organism, genome_type),
                     out_path    = out_path,
                 )
             )
@@ -154,6 +161,7 @@ def run_job(
     job:       BlastJob,
     *,
     dry_run:   bool = False,
+    overwrite: bool = False,
     max_retry: int  = 2,
 ) -> BlastJob:
     """
@@ -161,7 +169,7 @@ def run_job(
     with its status, duration, and error fields populated.
     """
     # ── Already done? ────────────────────────────────────────────────────────
-    if job.out_path.exists():
+    if job.out_path.exists() and not overwrite:
         log.debug("skip  %s (output exists)", job.label)
         job.status = JobStatus.SKIPPED
         return job
@@ -233,6 +241,7 @@ def run_all(
     *,
     workers:   int  = 4,
     dry_run:   bool = False,
+    overwrite: bool = False,
     max_retry: int  = 2,
 ) -> list[BlastJob]:
     """Run all jobs concurrently and return them with updated statuses."""
@@ -249,7 +258,7 @@ def run_all(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(run_job, job, dry_run=dry_run, max_retry=max_retry): job
+            pool.submit(run_job, job, dry_run=dry_run, overwrite=overwrite, max_retry=max_retry): job
             for job in jobs
         }
 
@@ -326,6 +335,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Preview commands without running them or writing files",
     )
     p.add_argument(
+        "--overwrite", "-o",
+        action="store_true",
+        help="Re-run BLAST even if output file already exists",
+    )
+    p.add_argument(
+        "--genome-type", "-g",
+        choices=["phased", "non_phased"],
+        default="phased",
+        help="Which genome assembly to query against",
+    )
+    p.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable DEBUG-level logging",
@@ -339,14 +359,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.verbose:
         log.setLevel(logging.DEBUG)
 
-    log.info("Discovering jobs…")
-    jobs = discover_jobs()
+    log.info("Discovering jobs (genome: %s)…", args.genome_type)
+    jobs = discover_jobs(genome_type=args.genome_type)
     log.info("Found %d job(s)", len(jobs))
 
     results = run_all(
         jobs,
         workers   = args.workers,
         dry_run   = args.dry_run,
+        overwrite = args.overwrite,
         max_retry = args.max_retry,
     )
 

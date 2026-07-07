@@ -13,7 +13,9 @@ def format_fasta_description(description, description_only=False):
         chr_ = match.group(5)
         
         new_description = f"{id_} | {name} | td {td} | sp {sp} | {chr_}"
-        # .replace(" ", "_")
+    else:
+        new_description = description.split("|")[0].strip() if "|" in description else description
+        id_ = name = td = sp = chr_ = ""
 
     if description_only:
         return new_description

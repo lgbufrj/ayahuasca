@@ -3,47 +3,32 @@ import subprocess
 from Bio import SeqIO, AlignIO
 import re
 import shutil
+import pandas as pd
+
+from pietree import PieTree
+
+from data import PROTEINS_PATH, proteins
 
 PATH_TO_IQTREE = "/home/pedro/Desktop/Programas/iqtree-3.0.1-Linux/bin/iqtree3"
 
-ptn_name = "sard4"
-uniprot_id = "Q9FLY0"
-reference_species = "arabidopsis"
+ptn = "stricto"
+ptn_data = proteins[ptn]
 
-aligned_file =      f"../proteins/{ptn_name}/analysis/genomic/blast/{reference_species}/reference_and_{ptn_name}_{uniprot_id}_aligned.fasta"
-parsed_fasta =       f"../proteins/{ptn_name}/analysis/phylogenetic/{reference_species}/reference_and_{ptn_name}_{uniprot_id}_aligned_parsed.fasta"
-output_file =       f"../proteins/{ptn_name}/analysis/phylogenetic/{reference_species}/tree/{ptn_name}_{uniprot_id}"
-# mb_output_file =    f"../proteins/{ptn_name}/analysis/phylogenetic/{reference_species}/{ptn_name}_{uniprot_id}.nex"
-
+ooi = "tucunaca"
+ref_org = "tabaco"
+uniprot_id = ptn_data["organisms"][ref_org]["uniprot_id"]
 # Definir outgroup e raiz como a sequencia de referencia
-outgroups = ["sp|Q9FLY0|SARD4_ARATH"]
-root = "sp|Q9FLY0|SARD4_ARATH"
+outgroups = [f"{ref_org}_{ptn}_{uniprot_id}"]
+root = outgroups[0]
+
+metadata_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/{ref_org}/{ptn}_{uniprot_id}_blast_filtered.csv"
+aligned_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/all_seqs_aligned.fasta"
+# aligned_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/{ref_org}/reference_and_{ptn}_{uniprot_id}_aligned.fasta"
+# output_file =       f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/{ref_org}/tree/{ptn}_{uniprot_id}"
+output_file =       f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/tree/{ptn}"
+# mb_output_file =    f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/{ref_org}/{ptn}_{uniprot_id}.nex"
 
 # print(f"Outgroups: {outgroups}")
-
-def generate_parsed_fasta():
-    genes = []
-    for record in SeqIO.parse(aligned_file, "fasta"):
-        desc = record.description
-        match = re.match(
-                r"([^|]+)\|([^|]+).*?transmembrane domain:(\w+)\|signal peptide:(\w+).*?\bchr([0-9]+[a-zA-Z]?)\b",
-                desc,
-            )
-        if match:
-            id_ = match.group(1)
-            name = match.group(2)
-            td = "y" if match.group(3).lower() == "yes" else "n"
-            sp = "y" if match.group(4).lower() == "yes" else "n"
-            chr_ = match.group(5)
-            record.id = f"{id_} | {ptn_name} | td {td} | sp {sp} | {chr_}".replace(" ", "_")
-            record.description = ""   
-        else:
-            print(f"Warning: Description format not recognized for record {record.id}. Skipping.")
-        genes.append(record)
-
-    # Create directory if it doesn't exist
-    os.makedirs(os.path.dirname(parsed_fasta), exist_ok=True)
-    SeqIO.write(genes, parsed_fasta, "fasta")
 
 def generate_phylogenetic_tree(parsed_fasta, output_file):
     if shutil.which(PATH_TO_IQTREE) is None:
@@ -93,25 +78,25 @@ def generate_phylogenetic_tree(parsed_fasta, output_file):
 #     # os.remove("mb.nex.tre")
 #     # os.remove("mb.nex.p") 
 
+
+def draw_tree(treefile, output_file):
+    tree = PieTree.from_newick(path=treefile, support_format="{bootstrap}/{alrt}")
+    tree.annotate(pd.read_csv(metadata_file, sep=';'), on="hit_id")
+    tree.tips.rename("{hit_description}")
+    # tree.clade(tree.find_nodes(
+    #     lambda n: n.metadata.get("expect", 1) == 0
+    # )).highlight(label="Expect = 0", label_position="center_right")
+    tree.metadata("chr").highlight(allow_single_tip=True, label_position="center_right")
+    tree.savefig(output_file, size=(1800,1200))
+
 if __name__ == "__main__":
     # Check if the input file exists
     if not os.path.isfile(aligned_file):
         raise FileNotFoundError(f"Input file '{aligned_file}' not found.")
     
-    # Generate the parsed FASTA file
-    generate_parsed_fasta()
-    
     # Generate the phylogenetic tree
-    generate_phylogenetic_tree(parsed_fasta, output_file)
-
-    # Replace every '_' with ' ' in the output file
-    with open(output_file + ".treefile", "r") as file:
-        tree_data = file.read()
-
-    tree_data = tree_data.replace('_', ' ')
-
-    with open(output_file + ".treefile", "w") as file:
-        file.write(tree_data)
+    # generate_phylogenetic_tree(aligned_file, output_file)
+    draw_tree(f"{output_file}.treefile", f"{output_file}.svg")
 
     print("Done!")
 

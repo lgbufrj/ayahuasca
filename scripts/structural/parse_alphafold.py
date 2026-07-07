@@ -59,6 +59,8 @@ from statistics import mean
 from Bio.PDB import MMCIFParser
 from Bio.PDB import PDBIO
 
+from data import PROTEINS_PATH, proteins
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Extraction
@@ -265,17 +267,22 @@ if __name__ == "__main__":
     # args = parser.parse_args()
 
     # for zip_file in args.zip_files:
+    
+    
+    for protein in proteins:
+        
+        for ooi in proteins[protein]["oois"]:
 
-    zip_files = ["/home/pedro/Desktop/projects/ayahuasca/pathways/harmine_biosynthesis/proteins/asmt/analysis/structural/alphafold/tucunaca/asmt_tucunacag00000034930_1.zip"]
+            predictions_dir = Path(f"{PROTEINS_PATH}/{protein}/analysis/structural/alphafold/{ooi}")
 
-    for zip_file in zip_files:
+            for zip_file in predictions_dir.glob("*.zip"):
 
-        print("\n" + "=" * 80)
-        print(f"Processing: {zip_file}")
-        print("=" * 80)
+                print("\n" + "=" * 80)
+                print(f"Processing: {zip_file}")
+                print("=" * 80)
 
-        try:
-            process_prediction_zip(zip_file)
+                try:
+                    process_prediction_zip(zip_file)
 
-        except Exception as exc:
-            print(f"[error] {zip_file}: {exc}")
+                except Exception as exc:
+                    print(f"[error] {zip_file}: {exc}")

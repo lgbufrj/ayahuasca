@@ -14,8 +14,12 @@ TEMPERATURE_C = 20          # °C  — change as needed
 R = 1.9872042               # cal/(mol·K)
 OUTPUT_CSV = f"{PAPER_PATH}/tables/boltz_affinity_results.csv"
 
+TOTAL_MODELS = 25           # number of structure models Boltz produces per prediction
+MODELS_N = 5                # how many of the most-confident models to keep per structure
+
 CSV_COLUMNS = [
     "protein", "organism", "reference_organism", "cofactor", "substrate",
+    "model", "model_rank",
     "binding_affinity", "kd", "dG", "IC50",
     "delta_affinity", "delta_kd", "delta_dG", "delta_IC50",
     "confidence", "delta_confidence",
@@ -83,8 +87,12 @@ def read_confidence(path: Path) -> dict | None:
     data = load_json(path)
     if data is None:
         return None
+    conf = data.get("confidence_score")
+    if conf is None:
+        print(f"  [WARN] confidence_score missing in {path}")
+        return None
     return {
-        "confidence": data.get("confidence_score"),
+        "confidence": conf,
         "plddt":      data.get("complex_plddt"),
         "iplddt":     data.get("complex_iplddt"),
         "pde":        data.get("complex_pde"),
@@ -115,26 +123,59 @@ def resolve_cofactor_substrate(rxn: dict, cofactor_list: list[str]) -> tuple[str
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Path builders
 # ---------------------------------------------------------------------------
 
-def build_file_paths(
+def build_pred_dir(
     boltz_analysis_dir: str,
     protein_name: str,
     uniprot_id: str,
     rxn_id: str,
     ref_organism: str,
     ooi: str | None,
-) -> tuple[Path, Path]:
+) -> tuple[Path, str]:
+    """Returns (predictions_dir, base_name) for either the reference or an OOI."""
     if ooi:
         results_dir = Path(f"{boltz_analysis_dir}/{ooi}/{ref_organism}/{rxn_id}")
-        affinity_file    = results_dir / f"predictions/{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}/affinity_{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}.json"
-        confidence_file  = results_dir / f"predictions/{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}/confidence_{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}_model_0.json"
+        base_name = f"{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}"
     else:
         results_dir = Path(f"{boltz_analysis_dir}/{ref_organism}/{rxn_id}")
-        affinity_file    = results_dir / f"predictions/{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}/affinity_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}.json"
-        confidence_file  = results_dir / f"predictions/{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}/confidence_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}_model_0.json"
-    return affinity_file, confidence_file
+        base_name = f"{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}"
+    return results_dir / f"predictions/{base_name}", base_name
+
+
+def build_affinity_path(pred_dir: Path, base_name: str) -> Path:
+    return pred_dir / f"affinity_{base_name}.json"
+
+
+def build_confidence_path(pred_dir: Path, base_name: str, model_idx: int) -> Path:
+    return pred_dir / f"confidence_{base_name}_model_{model_idx}.json"
+
+
+# ---------------------------------------------------------------------------
+# Top-N confidence model selection
+# ---------------------------------------------------------------------------
+
+def get_top_confidence_models(
+    pred_dir: Path,
+    base_name: str,
+    n: int = MODELS_N,
+    total_models: int = TOTAL_MODELS,
+) -> list[tuple[int, dict]]:
+    """
+    Reads confidence_*_model_{i}.json for i in [0, total_models), and returns
+    the top `n` (model_idx, confidence_dict) pairs sorted by confidence_score
+    descending. Models with missing/unreadable confidence files are skipped.
+    """
+    candidates = []
+    for model_idx in range(total_models):
+        conf_path = build_confidence_path(pred_dir, base_name, model_idx)
+        conf = read_confidence(conf_path)
+        if conf is not None:
+            candidates.append((model_idx, conf))
+
+    candidates.sort(key=lambda item: item[1]["confidence"], reverse=True)
+    return candidates[:n]
 
 
 def delta(ooi_val, ref_val):
@@ -142,6 +183,60 @@ def delta(ooi_val, ref_val):
         return None
     return ooi_val - ref_val
 
+
+# ---------------------------------------------------------------------------
+# Row construction
+# ---------------------------------------------------------------------------
+
+def make_base_row(protein_name, organism, ref_organism, cofactor, substrate,
+                   model_idx, model_rank, aff, conf, ref_aff=None, ref_conf=None):
+    """
+    Builds one CSV row. If ref_aff/ref_conf are None, this row IS the
+    reference (so all deltas are 0 relative to itself). Otherwise deltas
+    are computed against the supplied reference values (matched by rank).
+    """
+    return {
+        "protein":            protein_name,
+        "organism":           organism,
+        "reference_organism": ref_organism,
+        "cofactor":           cofactor,
+        "substrate":          substrate,
+        "model":              model_idx,
+        "model_rank":         model_rank,
+        "binding_affinity":   aff["binding_affinity"] if aff else None,
+        "kd":                 aff["kd"]               if aff else None,
+        "dG":                 aff["dG"]               if aff else None,
+        "IC50":               aff["IC50"]             if aff else None,
+        "delta_affinity":     delta(aff["binding_affinity"] if aff else None,
+                                     ref_aff["binding_affinity"] if ref_aff else None) if ref_aff is not None else (0.0 if aff else None),
+        "delta_kd":           delta(aff["kd"] if aff else None,
+                                     ref_aff["kd"] if ref_aff else None) if ref_aff is not None else (0.0 if aff else None),
+        "delta_dG":           delta(aff["dG"] if aff else None,
+                                     ref_aff["dG"] if ref_aff else None) if ref_aff is not None else (0.0 if aff else None),
+        "delta_IC50":         delta(aff["IC50"] if aff else None,
+                                     ref_aff["IC50"] if ref_aff else None) if ref_aff is not None else (0.0 if aff else None),
+        "confidence":         conf["confidence"] if conf else None,
+        "delta_confidence":   delta(conf["confidence"] if conf else None,
+                                     ref_conf["confidence"] if ref_conf else None) if ref_conf is not None else (0.0 if conf else None),
+        "plddt":              conf["plddt"]  if conf else None,
+        "delta_plddt":        delta(conf["plddt"] if conf else None,
+                                     ref_conf["plddt"] if ref_conf else None) if ref_conf is not None else (0.0 if conf else None),
+        "iplddt":             conf["iplddt"] if conf else None,
+        "delta_iplddt":       delta(conf["iplddt"] if conf else None,
+                                     ref_conf["iplddt"] if ref_conf else None) if ref_conf is not None else (0.0 if conf else None),
+        "pde":                conf["pde"]    if conf else None,
+        "delta_pde":          delta(conf["pde"] if conf else None,
+                                     ref_conf["pde"] if ref_conf else None) if ref_conf is not None else (0.0 if conf else None),
+        "ipde":               conf["ipde"]   if conf else None,
+        "delta_ipde":         delta(conf["ipde"] if conf else None,
+                                     ref_conf["ipde"] if ref_conf else None) if ref_conf is not None else (0.0 if conf else None),
+        "temperature":        TEMPERATURE_C,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
     rows = []
@@ -159,92 +254,53 @@ def main():
             for ref_organism, organism_data in protein_data["organisms"].items():
                 uniprot_id = organism_data["uniprot_id"]
 
-                # --- reference organism row ---
-                ref_aff_file, ref_conf_file = build_file_paths(
+                # --- reference organism: affinity + top-N confidence models ---
+                ref_pred_dir, ref_base_name = build_pred_dir(
                     boltz_analysis_dir, protein_name, uniprot_id,
                     rxn_id, ref_organism, ooi=None,
                 )
-                ref_aff  = read_affinity(ref_aff_file)
-                ref_conf = read_confidence(ref_conf_file)
+                ref_aff = read_affinity(build_affinity_path(ref_pred_dir, ref_base_name))
+                ref_top_models = get_top_confidence_models(ref_pred_dir, ref_base_name)
 
-                # Build reference row (deltas are all 0 for the ref itself)
-                ref_row = {
-                    "protein":           protein_name,
-                    "organism":          ref_organism,
-                    "reference_organism": ref_organism,
-                    "cofactor":          cofactor,
-                    "substrate":         substrate,
-                    # affinity metrics
-                    "binding_affinity":  ref_aff["binding_affinity"] if ref_aff else None,
-                    "kd":                ref_aff["kd"]               if ref_aff else None,
-                    "dG":                ref_aff["dG"]               if ref_aff else None,
-                    "IC50":              ref_aff["IC50"]             if ref_aff else None,
-                    "delta_affinity":    0.0 if ref_aff  else None,
-                    "delta_kd":          0.0 if ref_aff  else None,
-                    "delta_dG":          0.0 if ref_aff  else None,
-                    "delta_IC50":        0.0 if ref_aff  else None,
-                    # confidence metrics
-                    "confidence":        ref_conf["confidence"] if ref_conf else None,
-                    "delta_confidence":  0.0 if ref_conf else None,
-                    "plddt":             ref_conf["plddt"]      if ref_conf else None,
-                    "delta_plddt":       0.0 if ref_conf else None,
-                    "iplddt":            ref_conf["iplddt"]     if ref_conf else None,
-                    "delta_iplddt":      0.0 if ref_conf else None,
-                    "pde":               ref_conf["pde"]        if ref_conf else None,
-                    "delta_pde":         0.0 if ref_conf else None,
-                    "ipde":              ref_conf["ipde"]       if ref_conf else None,
-                    "delta_ipde":        0.0 if ref_conf else None,
-                    "temperature":       TEMPERATURE_C,
-                }
-                rows.append(ref_row)
+                if not ref_top_models:
+                    print(f"  [WARN] No confidence files found for {ref_base_name}")
 
-                # --- OOI rows ---
+                for rank, (model_idx, conf) in enumerate(ref_top_models, start=1):
+                    rows.append(make_base_row(
+                        protein_name, ref_organism, ref_organism, cofactor, substrate,
+                        model_idx, rank, ref_aff, conf,
+                        ref_aff=None, ref_conf=None,  # reference row: deltas are 0
+                    ))
+
+                # --- OOI rows: paired by confidence rank against the reference ---
                 for ooi in oois:
-                    ooi_aff_file, ooi_conf_file = build_file_paths(
+                    ooi_pred_dir, ooi_base_name = build_pred_dir(
                         boltz_analysis_dir, protein_name, uniprot_id,
                         rxn_id, ref_organism, ooi=ooi,
                     )
-                    ooi_aff  = read_affinity(ooi_aff_file)
-                    ooi_conf = read_confidence(ooi_conf_file)
+                    ooi_aff = read_affinity(build_affinity_path(ooi_pred_dir, ooi_base_name))
+                    ooi_top_models = get_top_confidence_models(ooi_pred_dir, ooi_base_name)
 
-                    ooi_row = {
-                        "protein":            protein_name,
-                        "organism":           ooi,
-                        "reference_organism": ref_organism,
-                        "cofactor":           cofactor,
-                        "substrate":          substrate,
-                        # affinity metrics
-                        "binding_affinity":   ooi_aff["binding_affinity"] if ooi_aff else None,
-                        "kd":                 ooi_aff["kd"]               if ooi_aff else None,
-                        "dG":                 ooi_aff["dG"]               if ooi_aff else None,
-                        "IC50":               ooi_aff["IC50"]             if ooi_aff else None,
-                        "delta_affinity":     delta(ooi_aff["binding_affinity"] if ooi_aff else None,
-                                                    ref_aff["binding_affinity"] if ref_aff else None),
-                        "delta_kd":           delta(ooi_aff["kd"] if ooi_aff else None,
-                                                    ref_aff["kd"] if ref_aff else None),
-                        "delta_dG":           delta(ooi_aff["dG"] if ooi_aff else None,
-                                                    ref_aff["dG"] if ref_aff else None),
-                        "delta_IC50":         delta(ooi_aff["IC50"] if ooi_aff else None,
-                                                    ref_aff["IC50"] if ref_aff else None),
-                        # confidence metrics
-                        "confidence":         ooi_conf["confidence"] if ooi_conf else None,
-                        "delta_confidence":   delta(ooi_conf["confidence"] if ooi_conf else None,
-                                                    ref_conf["confidence"] if ref_conf else None),
-                        "plddt":              ooi_conf["plddt"]  if ooi_conf else None,
-                        "delta_plddt":        delta(ooi_conf["plddt"] if ooi_conf else None,
-                                                    ref_conf["plddt"] if ref_conf else None),
-                        "iplddt":             ooi_conf["iplddt"] if ooi_conf else None,
-                        "delta_iplddt":       delta(ooi_conf["iplddt"] if ooi_conf else None,
-                                                    ref_conf["iplddt"] if ref_conf else None),
-                        "pde":                ooi_conf["pde"]    if ooi_conf else None,
-                        "delta_pde":          delta(ooi_conf["pde"] if ooi_conf else None,
-                                                    ref_conf["pde"] if ref_conf else None),
-                        "ipde":               ooi_conf["ipde"]   if ooi_conf else None,
-                        "delta_ipde":         delta(ooi_conf["ipde"] if ooi_conf else None,
-                                                    ref_conf["ipde"] if ref_conf else None),
-                        "temperature":        TEMPERATURE_C,
-                    }
-                    rows.append(ooi_row)
+                    if not ooi_top_models:
+                        print(f"  [WARN] No confidence files found for {ooi_base_name}")
+
+                    n_rows = max(len(ooi_top_models), 1)
+                    for rank in range(1, n_rows + 1):
+                        ooi_model_idx, ooi_conf = (
+                            ooi_top_models[rank - 1] if rank - 1 < len(ooi_top_models)
+                            else (None, None)
+                        )
+                        # pair with the reference's same-rank model, if it exists
+                        ref_conf = (
+                            ref_top_models[rank - 1][1] if rank - 1 < len(ref_top_models)
+                            else None
+                        )
+
+                        rows.append(make_base_row(
+                            protein_name, ooi, ref_organism, cofactor, substrate,
+                            ooi_model_idx, rank, ooi_aff, ooi_conf,
+                            ref_aff=ref_aff, ref_conf=ref_conf,
+                        ))
 
     # Write CSV
     with open(OUTPUT_CSV, "w", newline="") as f:

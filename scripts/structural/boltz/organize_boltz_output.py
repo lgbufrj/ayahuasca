@@ -3,7 +3,7 @@ import re
 import shutil
 from pathlib import Path
 
-results_dir = Path(f"{SCRIPTS_PATH}/structural/boltz/ayhuasca_paper/ayahuasca_boltz_results")
+results_dir = Path(f"{SCRIPTS_PATH}/structural/boltz/ayahuasca_paper/ayahuasca_boltz_results")
 
 
 def parse_folder_name(name: str) -> tuple[dict, bool] | tuple[None, None]:

@@ -14,8 +14,9 @@ def format_fasta_description(description, description_only=False):
         
         new_description = f"{id_} | {name} | td {td} | sp {sp} | {chr_}"
     else:
-        new_description = description.split("|")[0].strip() if "|" in description else description
-        id_ = name = td = sp = chr_ = ""
+        id_ = description.split("|")[0].strip() if "|" in description else description
+        new_description = id_
+        name = td = sp = chr_ = ""
 
     if description_only:
         return new_description

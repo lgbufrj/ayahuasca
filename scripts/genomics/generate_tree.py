@@ -1,104 +1,96 @@
 import os
 import subprocess
-from Bio import SeqIO, AlignIO
-import re
+from Bio import SeqIO
 import shutil
 import pandas as pd
 
 from pietree import PieTree
 
-from data import PROTEINS_PATH, proteins
+from data import PROTEINS_PATH, PAPER_PATH, proteins
 
 PATH_TO_IQTREE = "/home/pedro/Desktop/Programas/iqtree-3.0.1-Linux/bin/iqtree3"
+PTNS = ["stricto", "t5h"]
 
-ptn = "stricto"
-ptn_data = proteins[ptn]
 
-ooi = "tucunaca"
-ref_org = "tabaco"
-uniprot_id = ptn_data["organisms"][ref_org]["uniprot_id"]
-# Definir outgroup e raiz como a sequencia de referencia
-outgroups = [f"{ref_org}_{ptn}_{uniprot_id}"]
-root = outgroups[0]
+def clean_alignment(input_fasta: str, output_fasta: str) -> int:
+    records = list(SeqIO.parse(input_fasta, "fasta"))
+    cleaned = [r for r in records if r.id and r.id.strip()]
+    removed = len(records) - len(cleaned)
+    if removed:
+        print(f"  Removed {removed} sequence(s) with empty names")
+    SeqIO.write(cleaned, output_fasta, "fasta")
+    return len(cleaned)
 
-metadata_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/{ref_org}/{ptn}_{uniprot_id}_blast_filtered.csv"
-aligned_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/all_seqs_aligned.fasta"
-# aligned_file =      f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/{ref_org}/reference_and_{ptn}_{uniprot_id}_aligned.fasta"
-# output_file =       f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/{ref_org}/tree/{ptn}_{uniprot_id}"
-output_file =       f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/tree/{ptn}"
-# mb_output_file =    f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}/{ref_org}/{ptn}_{uniprot_id}.nex"
 
-# print(f"Outgroups: {outgroups}")
-
-def generate_phylogenetic_tree(parsed_fasta, output_file):
+def generate_phylogenetic_tree(parsed_fasta: str, output_prefix: str, outgroup_names: list[str]) -> None:
     if shutil.which(PATH_TO_IQTREE) is None:
-        raise FileNotFoundError(f"IQ-TREE not found in PATH (tried '{PATH_TO_IQTREE}').")
+        raise FileNotFoundError(f"IQ-TREE not found at '{PATH_TO_IQTREE}'.")
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    os.makedirs(os.path.dirname(output_prefix), exist_ok=True)
 
     command = [
         PATH_TO_IQTREE, "-s", parsed_fasta, "-m", "MFP",
         "-alrt", "1000", "-B", "1000",
-        "--redo", "--prefix", output_file
+        "--redo", "--prefix", output_prefix,
     ]
+    if outgroup_names:
+        command += ["-o", ",".join(outgroup_names)]
 
     result = subprocess.run(command, capture_output=True, text=True)
-    print("STDOUT:", result.stdout)
-    print("STDERR:", result.stderr)
 
-    if result.returncode == 0:
-        print("Phylogenetic tree generated successfully.")
-    else:
-        raise RuntimeError(f"IQ-TREE failed with code {result.returncode}")
+    tail = result.stdout[-1500:] if len(result.stdout) > 1500 else result.stdout
+    print(tail)
 
-# def setUpAndRunMrBayes(file):
+    if result.returncode != 0:
+        raise RuntimeError(f"IQ-TREE failed with code {result.returncode}\n{result.stderr}")
 
-#     # Convert aligned FASTA file to NEXUS format
-#     AlignIO.convert(aligned_file, "fasta", file, "nexus", "DNA")
-
-#     # Check if the conversion was successful
-#     if not os.path.isfile(file):
-#         raise FileNotFoundError(f"Failed to convert {aligned_file} to NEXUS format.")
-
-#     # Set up the MrBayes configuration
-#     with open(file, "a") as mb_file:
-#         mb_file.write("Begin mrbayes;\n")
-#         mb_file.write("  set autoclose=yes;\n")
-#         mb_file.write("  lset nst=6 rates=gamma;\n")
-#         mb_file.write("  mcmc ngen=1000000 printfreq=1000 samplefreq=100 nchains=4 savebrlens=yes;\n")
-#         mb_file.write("  sumt burnin=250;\n")
-#         mb_file.write("End;\n")
-
-#     # Run MrBayes
-#     subprocess.run(["mb", file])
-#     # Clean up
-#     # os.remove("mb.nex")
-#     # os.remove("mb.nex.bak")
-#     # os.remove("mb.nex.log")
-#     # os.remove("mb.nex.tre")
-#     # os.remove("mb.nex.p") 
+    print("Phylogenetic tree generated successfully.")
 
 
-def draw_tree(treefile, output_file):
+def draw_tree(treefile: str, metadata_file: str, output_svg: str) -> None:
     tree = PieTree.from_newick(path=treefile, support_format="{bootstrap}/{alrt}")
-    tree.annotate(pd.read_csv(metadata_file, sep=';'), on="hit_id")
+    tree.annotate(pd.read_csv(metadata_file, sep=','), on="hit_id")
     tree.tips.rename("{hit_description}")
-    # tree.clade(tree.find_nodes(
-    #     lambda n: n.metadata.get("expect", 1) == 0
-    # )).highlight(label="Expect = 0", label_position="center_right")
     tree.metadata("chr").highlight(allow_single_tip=True, label_position="center_right")
-    tree.savefig(output_file, size=(1800,1200))
+    tree.savefig(output_svg, size=(1800, 1200))
+
 
 if __name__ == "__main__":
-    # Check if the input file exists
-    if not os.path.isfile(aligned_file):
-        raise FileNotFoundError(f"Input file '{aligned_file}' not found.")
-    
-    # Generate the phylogenetic tree
-    # generate_phylogenetic_tree(aligned_file, output_file)
-    draw_tree(f"{output_file}.treefile", f"{output_file}.svg")
+    for ptn in PTNS:
+        ptn_data = proteins[ptn]
 
-    print("Done!")
+        for ooi in ptn_data["oois"]:
+            aligned_file = f"{PROTEINS_PATH}/{ptn}/analysis/genomic/blast/{ooi}/all_seqs_aligned.fasta"
 
-    # setUpAndRunMrBayes(mb_output_file)
+            if not os.path.isfile(aligned_file):
+                print(f"  Skipping {ptn}/{ooi}: aligned file not found")
+                continue
 
+            print(f"\nProcessing {ptn} / {ooi}...")
+
+            ref_orgs = list(ptn_data["organisms"].keys())
+            outgroups = [
+                f"{org}_{ptn}_{ptn_data['organisms'][org]['uniprot_id']}"
+                for org in ref_orgs
+            ]
+
+            phylo_dir = f"{PROTEINS_PATH}/{ptn}/analysis/phylo/{ooi}"
+            os.makedirs(phylo_dir, exist_ok=True)
+
+            clean_fasta = f"{phylo_dir}/clean_alignment.fasta"
+            num_seqs = clean_alignment(aligned_file, clean_fasta)
+
+            if num_seqs < 4:
+                print(f"  Skipping {ptn}/{ooi}: only {num_seqs} sequences (need at least 4)")
+                continue
+
+            output_prefix = f"{phylo_dir}/tree/{ptn}"
+            generate_phylogenetic_tree(clean_fasta, output_prefix, outgroups)
+
+            metadata_file = f"{PAPER_PATH}/tables/{ooi}_blast_abundance.csv"
+            if not os.path.exists(metadata_file):
+                print(f"  Warning: metadata not found at {metadata_file}, skipping tree drawing")
+                continue
+
+            draw_tree(f"{output_prefix}.treefile", metadata_file, f"{output_prefix}.svg")
+            print(f"  Done! Tree: {output_prefix}.svg")

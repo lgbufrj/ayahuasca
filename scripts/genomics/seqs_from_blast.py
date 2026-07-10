@@ -2,10 +2,17 @@ from Bio import SeqIO
 from pandas import read_csv
 from collections import defaultdict
 import os
+import sys
 from data import proteins, organisms, PROTEINS_PATH, GENOME_PATH
 from helper_functions import format_fasta_description
 
-MAX_RESULTS = 10
+OVERWRITE = "--overwrite" in sys.argv
+GENOME_TYPE = "phased"
+for i, arg in enumerate(sys.argv):
+    if arg in ("--genome-type", "-g") and i + 1 < len(sys.argv):
+        GENOME_TYPE = sys.argv[i + 1]
+
+MAX_RESULTS = 100
 
 def get_protein_organisms(proteins):
     result = []
@@ -31,7 +38,7 @@ for prot_name, species, fasta_name in prot:
 
         blast_res_path = f"{PROTEINS_PATH}/{prot_name}/analysis/genomic/blast/{ooi}/{species}/{fasta_name}_blast_filtered.fasta"
 
-        if os.path.exists(blast_res_path):
+        if os.path.exists(blast_res_path) and not OVERWRITE:
             print(f"Skipping {ooi} {species} {fasta_name}...")
             blast_recs = list(SeqIO.parse(blast_res_path, "fasta"))
         else:
@@ -46,7 +53,7 @@ for prot_name, species, fasta_name in prot:
 
             seq_by_id = {
                 rec.id.split("|")[0]: rec
-                for rec in SeqIO.parse(f"{GENOME_PATH}/{ooi}/phased/prot.fasta", "fasta")
+                for rec in SeqIO.parse(f"{GENOME_PATH}/{ooi}/{GENOME_TYPE}/prot.fasta", "fasta")
             }
 
             blast_recs = []

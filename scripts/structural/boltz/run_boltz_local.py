@@ -2,8 +2,8 @@ import os
 import subprocess
 from tqdm import tqdm
 
-input_dir = "./ayahuasca_boltz_inputs"
-output_dir = "./ayahuasca_boltz_results"
+input_dir = "./boltz_inputs"
+output_dir = "./boltz_results"
 
 os.makedirs(output_dir, exist_ok=True)
 
@@ -16,6 +16,6 @@ for yaml_file in tqdm(yaml_files, desc="Running Boltz predictions"):
         input_path,
         "--out_dir", output_dir,
         "--use_msa_server",
-        "--recycling_steps", 10,
-        "--diffusion_samples", 25
+        "--recycling_steps", 10, # AlphaFold: 10
+        "--diffusion_samples", 25 # AlphaFold: 25
     ])

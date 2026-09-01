@@ -15,10 +15,11 @@ R = 1.9872042               # cal/(mol·K)
 OUTPUT_CSV = f"{PAPER_PATH}/tables/boltz_affinity_results.csv"
 
 TOTAL_MODELS = 25           # number of structure models Boltz produces per prediction
-MODELS_N = 5                # how many of the most-confident models to keep per structure
+MODELS_N = 1                # how many of the most-confident models to keep per structure
 
 CSV_COLUMNS = [
-    "protein", "organism", "reference_organism", "cofactor", "substrate",
+    "protein", "organism", "id", "reference_organism", "rxn_id",
+    "cofactor", "substrate",
     "model", "model_rank",
     "binding_affinity", "kd", "dG", "IC50",
     "delta_affinity", "delta_kd", "delta_dG", "delta_IC50",
@@ -126,22 +127,49 @@ def resolve_cofactor_substrate(rxn: dict, cofactor_list: list[str]) -> tuple[str
 # Path builders
 # ---------------------------------------------------------------------------
 
-def build_pred_dir(
+def parse_boltz_run_name(dir_name: str, protein_name: str, rxn_id: str) -> tuple[str, str] | None:
+    """
+    Parses a flat outputs dir name like boltz_results_{organism}_{protein}_{rxn_id}
+    (or boltz_results_{organism}_{protein}_{gene_id}_{rxn_id}) looking like:
+        boltz_results_arabidopsis_stricto_P94111_r1   (reference)
+        boltz_results_tucunaca_stricto_GeneX.1_r1     (isoform)
+    Returns (organism, id) or None if the name doesn't belong to this protein/rxn.
+    """
+    prefix = "boltz_results_"
+    if not dir_name.startswith(prefix):
+        return None
+    rest = dir_name[len(prefix):]
+    if not rest.endswith(f"_{rxn_id}"):
+        return None
+    core = rest[: -len(f"_{rxn_id}")]  # {organism}_{protein}_{id}
+    marker = f"_{protein_name}_"
+    if marker not in core:
+        return None
+    organism, _, gid = core.partition(marker)
+    if not organism or not gid:
+        return None
+    return organism, gid
+
+
+def scan_boltz_runs(
     boltz_analysis_dir: str,
     protein_name: str,
-    uniprot_id: str,
     rxn_id: str,
-    ref_organism: str,
-    ooi: str | None,
-) -> tuple[Path, str]:
-    """Returns (predictions_dir, base_name) for either the reference or an OOI."""
-    if ooi:
-        results_dir = Path(f"{boltz_analysis_dir}/{ooi}/{ref_organism}/{rxn_id}")
-        base_name = f"{ooi}_{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}"
-    else:
-        results_dir = Path(f"{boltz_analysis_dir}/{ref_organism}/{rxn_id}")
-        base_name = f"{ref_organism}_{protein_name}_{uniprot_id}_{rxn_id}"
-    return results_dir / f"predictions/{base_name}", base_name
+) -> dict[tuple[str, str], Path]:
+    """Scan boltz/outputs for every boltz_results_* run matching this protein+rxn.
+    Returns {(organism, id): pred_dir}."""
+    output_dir = Path(f"{boltz_analysis_dir}/outputs")
+    runs = {}
+    if not output_dir.is_dir():
+        return runs
+    for folder in sorted(output_dir.iterdir()):
+        if not folder.is_dir():
+            continue
+        parsed = parse_boltz_run_name(folder.name, protein_name, rxn_id)
+        if parsed is None:
+            continue
+        runs[parsed] = folder / f"predictions/{folder.name[len('boltz_results_'):]}"
+    return runs
 
 
 def build_affinity_path(pred_dir: Path, base_name: str) -> Path:
@@ -188,7 +216,8 @@ def delta(ooi_val, ref_val):
 # Row construction
 # ---------------------------------------------------------------------------
 
-def make_base_row(protein_name, organism, ref_organism, cofactor, substrate,
+def make_base_row(protein_name, organism, protein_id, ref_organism, rxn_id,
+                   cofactor, substrate,
                    model_idx, model_rank, aff, conf, ref_aff=None, ref_conf=None):
     """
     Builds one CSV row. If ref_aff/ref_conf are None, this row IS the
@@ -198,7 +227,9 @@ def make_base_row(protein_name, organism, ref_organism, cofactor, substrate,
     return {
         "protein":            protein_name,
         "organism":           organism,
+        "id":                 protein_id,
         "reference_organism": ref_organism,
+        "rxn_id":             rxn_id,
         "cofactor":           cofactor,
         "substrate":          substrate,
         "model":              model_idx,
@@ -244,61 +275,66 @@ def main():
     for protein_name, protein_data in proteins.items():
         boltz_analysis_dir = f"{PROTEINS_PATH}/{protein_name}/analysis/structural/boltz"
 
-        cofactor_list  = protein_data.get("cofactors", [])
-        oois           = protein_data.get("oois", [])
+        cofactor_list = protein_data.get("cofactors", [])
+        ref_orgs      = protein_data.get("organisms", {})
 
         for rxn in protein_data["reactions"]:
             rxn_id = rxn["id"]
             cofactor, substrate = resolve_cofactor_substrate(rxn, cofactor_list)
 
-            for ref_organism, organism_data in protein_data["organisms"].items():
-                uniprot_id = organism_data["uniprot_id"]
+            runs = scan_boltz_runs(boltz_analysis_dir, protein_name, rxn_id)
 
-                # --- reference organism: affinity + top-N confidence models ---
-                ref_pred_dir, ref_base_name = build_pred_dir(
-                    boltz_analysis_dir, protein_name, uniprot_id,
-                    rxn_id, ref_organism, ooi=None,
-                )
-                ref_aff = read_affinity(build_affinity_path(ref_pred_dir, ref_base_name))
-                ref_top_models = get_top_confidence_models(ref_pred_dir, ref_base_name)
+            # ── Split runs into reference enzymes vs isoform candidates ──
+            ref_runs = {}
+            iso_runs = {}
+            for (org, oid), pred_dir in runs.items():
+                if org in ref_orgs:
+                    ref_runs[(org, oid)] = pred_dir
+                else:
+                    iso_runs[(org, oid)] = pred_dir
 
-                if not ref_top_models:
-                    print(f"  [WARN] No confidence files found for {ref_base_name}")
+            # Load affinity + top-N confidence models per run
+            run_data = {}
+            for key, pred_dir in runs.items():
+                base_name = pred_dir.name
+                aff = read_affinity(build_affinity_path(pred_dir, base_name))
+                top = get_top_confidence_models(pred_dir, base_name)
+                if not top:
+                    print(f"  [WARN] No confidence files found for {base_name}")
+                run_data[key] = (aff, top)
 
-                for rank, (model_idx, conf) in enumerate(ref_top_models, start=1):
+            # ── Reference rows: deltas are 0 ──
+            for (org, oid), pred_dir in ref_runs.items():
+                aff, top_models = run_data[(org, oid)]
+                for rank, (model_idx, conf) in enumerate(top_models, start=1):
                     rows.append(make_base_row(
-                        protein_name, ref_organism, ref_organism, cofactor, substrate,
-                        model_idx, rank, ref_aff, conf,
-                        ref_aff=None, ref_conf=None,  # reference row: deltas are 0
+                        protein_name, org, oid, org, rxn_id, cofactor, substrate,
+                        model_idx, rank, aff, conf,
+                        ref_aff=None, ref_conf=None,
                     ))
 
-                # --- OOI rows: paired by confidence rank against the reference ---
-                for ooi in oois:
-                    ooi_pred_dir, ooi_base_name = build_pred_dir(
-                        boltz_analysis_dir, protein_name, uniprot_id,
-                        rxn_id, ref_organism, ooi=ooi,
-                    )
-                    ooi_aff = read_affinity(build_affinity_path(ooi_pred_dir, ooi_base_name))
-                    ooi_top_models = get_top_confidence_models(ooi_pred_dir, ooi_base_name)
+            # ── Isoform rows: one row per (isoform, reference) pair ──
+            for (iso_org, iso_oid), pred_dir in iso_runs.items():
+                iso_aff, iso_top = run_data[(iso_org, iso_oid)]
 
-                    if not ooi_top_models:
-                        print(f"  [WARN] No confidence files found for {ooi_base_name}")
+                for (ref_org, ref_oid), _ in ref_runs.items():
+                    ref_aff, ref_top = run_data[(ref_org, ref_oid)]
 
-                    n_rows = max(len(ooi_top_models), 1)
+                    n_rows = max(len(iso_top), 1)
                     for rank in range(1, n_rows + 1):
-                        ooi_model_idx, ooi_conf = (
-                            ooi_top_models[rank - 1] if rank - 1 < len(ooi_top_models)
+                        iso_model_idx, iso_conf = (
+                            iso_top[rank - 1] if rank - 1 < len(iso_top)
                             else (None, None)
                         )
                         # pair with the reference's same-rank model, if it exists
                         ref_conf = (
-                            ref_top_models[rank - 1][1] if rank - 1 < len(ref_top_models)
+                            ref_top[rank - 1][1] if rank - 1 < len(ref_top)
                             else None
                         )
 
                         rows.append(make_base_row(
-                            protein_name, ooi, ref_organism, cofactor, substrate,
-                            ooi_model_idx, rank, ooi_aff, ooi_conf,
+                            protein_name, iso_org, iso_oid, ref_org, rxn_id, cofactor, substrate,
+                            iso_model_idx, rank, iso_aff, iso_conf,
                             ref_aff=ref_aff, ref_conf=ref_conf,
                         ))
 

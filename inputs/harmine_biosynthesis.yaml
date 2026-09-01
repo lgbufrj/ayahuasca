@@ -321,22 +321,34 @@ proteins:
       ref: false
       substrates:
       - tetrahydroharman
+      - o2
+      - nadph
       products:
       - tetrahydroharmol
+      - water
+      - nadp+
       smiles: '[H]c1c([H])c([H])c2c(c1[H])c1c(n2[H])[C@]([H])(C([H])([H])[H])N([H])C([H])([H])C1([H])[H]>>[H]Oc1c([H])c([H])c2c3c(n([H])c2c1[H])[C@]([H])(C([H])([H])[H])N([H])C([H])([H])C3([H])[H]'
     - id: r2
       ref: false
       substrates:
       - harman
+      - o2
+      - nadph
       products:
       - harmol
+      - water
+      - nadp+
       smiles: '[H]c1nc(C([H])([H])[H])c2c(c1[H])c1c([H])c([H])c([H])c([H])c1n2[H]>>[H]c1c([H])c2c3c([H])c([H])n([H])c(C([H])([H])[H])c3n([H])c2c([H])c1=O'
     - id: r3
       ref: false
       substrates:
       - harmalan
+      - o2
+      - nadph
       products:
       - harmalol
+      - water
+      - nadp+
       smiles: '[H]c1c([H])c([H])c2c(c1[H])c1c(n2[H])C(C([H])([H])[H])=NC([H])([H])C1([H])[H]>>[H]Oc1c([H])c([H])c2c3c(n([H])c2c1[H])C(C([H])([H])[H])=NC([H])([H])C3([H])[H]'
     cofactors:
     - nadph

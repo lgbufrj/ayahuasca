@@ -24,8 +24,11 @@ def get_protein_organisms(proteins):
     return result
 
 def extract_ids_from_csv(list_file):
-    df = read_csv(list_file, sep=';')
-    return df['hit_id'].to_list()
+    try:
+        df = read_csv(list_file, sep=';')
+        return df['hit_id'].to_list()
+    except:
+        return []
 
 print("Extracting ids...")
 
@@ -50,6 +53,7 @@ for prot_name, species, fasta_name in prot:
 
             print(f"Extracting seqs for {prot_name} in {ooi} x {species}...")
             ids = extract_ids_from_csv(input_csv_path)[:MAX_RESULTS]
+            if ids == []: continue
 
             seq_by_id = {
                 rec.id.split("|")[0]: rec

@@ -141,16 +141,18 @@ for prot_name, ref_organism, fasta_name in prots:
                                 continue
 
                             new_description, id_, name, td, sp, chr_ = format_fasta_description(alignment.hit_def)
+                            
+                            # if ".1" not in id_: continue
 
                             # ── Abundance filter ────────────────────────────────
+                            if GENOME_TYPE == "phased":
+                                non_phased_id = mapping.get(id_, "")
+                                lookup_id = non_phased_id.rsplit(".", 1)[0] if non_phased_id else ""
+                            else:
+                                lookup_id = id_.rsplit(".", 1)[0]
+                            ab = abundances.get(lookup_id) if lookup_id else None
                             if ABUNDANCE_FILTER and abundances and id_:
-                                if GENOME_TYPE == "phased":
-                                    non_phased_id = mapping.get(id_, "")
-                                    lookup_id = non_phased_id.rsplit(".", 1)[0] if non_phased_id else ""
-                                else:
-                                    lookup_id = id_.rsplit(".", 1)[0]
 
-                                ab = abundances.get(lookup_id) if lookup_id else None
                                 if ab is not None:
                                     if (
                                         ab["fpkm"] < MIN_FPKM
@@ -172,6 +174,9 @@ for prot_name, ref_organism, fasta_name in prots:
                                 'td': td,
                                 'sp': sp,
                                 'chr': chr_,
+                                'fpkm': ab["fpkm"],
+                                'tpm': ab["tpm"],
+                                'ab_coverage': ab["coverage"],
                                 'hit_description': new_description,
                             })
 

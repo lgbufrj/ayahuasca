@@ -1,7 +1,17 @@
 import os
 import re
 import json
+import argparse
 from data import COMPOUNDS_PATH, compounds
+
+# Experimental/literature Gibbs free energies (kcal/mol) for species whose
+# ORCA output has no thermochemistry section (e.g. a single proton). Keys are
+# compound names. These are stored in Eh under "final_gibbs_eh".
+LITERATURE_FINAL_GIBBS_KCALPMOL = {
+    "h+": 2.37973231,
+}
+
+KCALPMOL_TO_EH = 1 / 627.5094740631
 
 # Extract Gibbs value from ORCA output file
 def parse_orca_output(output_file_path):
@@ -31,7 +41,14 @@ def parse_orca_output(output_file_path):
     with open(output_file_path, "r") as f:
         content = f.read()
         
-        gibbs_section = re.search(r"GIBBS FREE ENERGY(.*?)Maximum memory used", content, re.DOTALL)
+        # The GIBBS FREE ENERGY block is not always followed by a
+        # "Maximum memory used" line (it depends on the ORCA run type), so
+        # fall back to the next section header or the end of the file.
+        gibbs_section = re.search(
+            r"GIBBS FREE ENERGY(.*?)(?:Maximum memory used|SUGGESTED CITATIONS|\Z)",
+            content,
+            re.DOTALL,
+        )
         if gibbs_section:
             section_text = gibbs_section.group(1)
             
@@ -67,6 +84,14 @@ def generate_json_report(gibbs_data, output_json_path):
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description="Parse ORCA output files for Gibbs free energy.")
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Re-parse and overwrite existing JSON reports instead of skipping them.",
+    )
+    args = parser.parse_args()
+
     for cpd, info in compounds.items():
         cpd_id = info["pubchem_id"]
     
@@ -75,12 +100,19 @@ if __name__ == "__main__":
         
         if os.path.exists(output_file):
             
-            # Skip if JSON already exists
-            if os.path.exists(json_output_file):
+            # Skip if JSON already exists (unless --overwrite is given)
+            if os.path.exists(json_output_file) and not args.overwrite:
                 print(f"JSON report already exists for {cpd} (PubChem ID: {cpd_id}), skipping...")
                 continue
             
             gibbs_info = parse_orca_output(output_file)
+
+            # Fall back to literature values when no thermochemistry section exists
+            if not gibbs_info and cpd in LITERATURE_FINAL_GIBBS_KCALPMOL:
+                gibbs_info["final_gibbs_eh"] = round(
+                    LITERATURE_FINAL_GIBBS_KCALPMOL[cpd] * KCALPMOL_TO_EH, 10
+                )
+
             print(f"Gibbs free energy data for {cpd} (PubChem ID: {cpd_id}):")
             for key, value in gibbs_info.items():
                 print(f"  {key}: {value}")

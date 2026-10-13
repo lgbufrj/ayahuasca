@@ -16,6 +16,9 @@ OUTPUT_PNG = f"{PAPER_PATH}/figures/volcano_plot_tucunaca_vs_caupuri.png"
 OUTPUT_PNG_STRICT = f"{PAPER_PATH}/figures/volcano_plot_tucunaca_vs_caupuri_strictosidine.png"
 OUTPUT_PNG_TOP10 = f"{PAPER_PATH}/figures/volcano_plot_tucunaca_vs_caupuri_top10.png"
 OUTPUT_CSV = f"{PAPER_PATH}/tables/significant_genes.csv"
+OUTPUT_PNG_BOLTZ = f"{PAPER_PATH}/figures/volcano_plot_tucunaca_vs_caupuri_boltz_proteins.png"
+OUTPUT_CSV_BOLTZ = f"{PAPER_PATH}/tables/boltz_tucunaca_caupuri_translation.csv"
+BOLTZ_AFFINITY = f"{PAPER_PATH}/tables/boltz_affinity_results.csv"
 BRIDGE_FILE = f"{TRANSCRIPTOME_PATH}/gene_id_bridge.csv"
 TUCUNACA_BLAST = f"{PAPER_PATH}/tables/tucunaca_blast_abundance.csv"
 CAUPURI_BLAST = f"{PAPER_PATH}/tables/caupuri_blast_abundance.csv"
@@ -26,6 +29,31 @@ CAUPURI_PROT_PHASED = f"{TRANSCRIPTOME_PATH}/../genome/caupuri/phased/prot.fasta
 STRICTO_BLAST = f"{TRANSCRIPTOME_PATH}/../proteins/stricto/analysis/genomic/blast"
 STRICTO_PHYLO = f"{TRANSCRIPTOME_PATH}/../proteins/stricto/analysis/phylo"
 GENOME_PATH = f"{TRANSCRIPTOME_PATH}/../genome"
+
+# Colour / label key for the Boltz-validated proteins (enzyme classes in the pathway).
+# hrp and peroxidase share an identical gene set, so they share one colour.
+BOLTZ_CLASS_COLORS = {
+    "stricto": "#1f77b4",
+    "sard4": "#2ca02c",
+    "t5h": "#d62728",
+    "asmt": "#9467bd",
+    "pmomt1": "#ff7f0e",
+    "peroxidase": "#8c564b",
+    "hrp": "#8c564b",
+}
+
+BOLTZ_CLASS_LABELS = {
+    "stricto": "STRICTOSIDINE SYNTHASE",
+    "sard4": "SARD4 (tryptamine dimethylallyltransferase)",
+    "t5h": "T5H (tryptamine 5-monooxygenase)",
+    "asmt": "ASMT (strictosidine N-methyltransferase)",
+    "pmomt1": "PMOMT1 (prunacine methyltransferase)",
+    "peroxidase": "PEROXIDASE / HRP",
+    "hrp": "PEROXIDASE / HRP",
+}
+
+# Genes predicted as several classes are drawn under the first matching class.
+BOLTZ_CLASS_PRIORITY = ["stricto", "sard4", "t5h", "asmt", "pmomt1", "peroxidase", "hrp"]
 
 
 def _load_emapper(zip_path: str, member: str) -> pd.DataFrame:
@@ -128,6 +156,16 @@ def _load_all_gene_id_maps() -> dict:
     return mapping
 
 
+def _stricto_blast_ids(df: pd.DataFrame) -> set:
+    mask = df["hit_description"].str.contains("STRICTOSIDINE SYNTHASE", case=False, na=False)
+    hits = df.loc[mask]
+    for col in ("non_phased_id", "hit_id"):
+        ids = {g.split(".")[0] for g in hits[col].dropna() if isinstance(g, str) and g}
+        if ids:
+            return ids
+    return set()
+
+
 def load_strictosidine_ids():
     tuc_ids = set()
     cau_ids = set()
@@ -137,16 +175,11 @@ def load_strictosidine_ids():
     cau_ids |= _ids_from_fasta(CAUPURI_PROT, "CaupuriG")
 
     # Source 2: BLAST abundance CSVs (STRICTOSIDINE SYNTHASE in hit_description)
+    # non_phased_id can be empty in regenerated tables -> fall back to hit_id
     tuc = pd.read_csv(TUCUNACA_BLAST)
     cau = pd.read_csv(CAUPURI_BLAST)
-    tuc_ids |= {g.split(".")[0] for g in tuc.loc[
-        tuc["hit_description"].str.contains("STRICTOSIDINE SYNTHASE", case=False, na=False),
-        "non_phased_id"
-    ]}
-    cau_ids |= {g.split(".")[0] for g in cau.loc[
-        cau["hit_description"].str.contains("STRICTOSIDINE SYNTHASE", case=False, na=False),
-        "non_phased_id"
-    ]}
+    tuc_ids |= _stricto_blast_ids(tuc)
+    cau_ids |= _stricto_blast_ids(cau)
 
     # Source 3: genomic blast all_seqs.fasta
     for species in ("tucunaca", "caupuri"):
@@ -225,6 +258,196 @@ def load_phased_map():
                 elif nid not in cau_map and nid.startswith("Caupuri"):
                     cau_map[nid] = pid
     return tuc_map, cau_map
+
+
+def load_boltz_translation() -> pd.DataFrame:
+    """Tucunaca Boltz proteins -> Tucunaca transcriptome gene -> Caupuri ortholog."""
+    if not Path(BOLTZ_AFFINITY).exists():
+        raise FileNotFoundError(f"missing Boltz affinity table: {BOLTZ_AFFINITY}")
+
+    raw = pd.read_csv(BOLTZ_AFFINITY)
+    raw = raw.loc[raw["organism"] == "tucunaca"].copy()
+    raw["tucunaca_id"] = raw["id"].str.split(".").str[0]
+
+    best = raw.loc[raw["model_rank"] == 1]
+    table = best.groupby(["protein", "tucunaca_id"], as_index=False).agg(
+        boltz_id=("id", lambda s: ";".join(sorted(set(s)))),
+        substrates=("substrate", lambda s: ";".join(sorted(set(s.astype(str))))),
+        n_models=("model_rank", "size"),
+        best_binding_affinity=("binding_affinity", "max"),
+    ).rename(columns={"protein": "protein_class"})
+
+    # Caupuri orthologs come from the transcriptome translation table (seed_ortholog)
+    bridge = pd.read_csv(BRIDGE_FILE)
+    table["caupuri_id"] = table["tucunaca_id"].map(
+        bridge.drop_duplicates("tucunaca_id").set_index("tucunaca_id")["caupuri_id"]
+    )
+
+    # every class a gene was predicted as, plus the single class used for plotting
+    classes = table.groupby("tucunaca_id")["protein_class"].apply(lambda s: sorted(set(s)))
+    table["protein_classes"] = table["tucunaca_id"].map(classes).apply(";".join)
+    table["plot_class"] = table["tucunaca_id"].map(classes).apply(_display_class)
+    return table.sort_values(["plot_class", "tucunaca_id"]).reset_index(drop=True)
+
+
+def _display_class(gene_classes) -> str:
+    for name in BOLTZ_CLASS_PRIORITY:
+        if name in gene_classes:
+            return name
+    return sorted(gene_classes)[0]
+
+
+def _annotate_boltz(merged: pd.DataFrame, translation: pd.DataFrame) -> pd.DataFrame:
+    """Attach protein class / expression stats of Boltz genes to the volcano frame."""
+    stats = merged[
+        ["tucunaca_id", "log2fc", "neg_log10_p", "tpm_t", "tpm_c",
+         "original_tucunaca_id", "original_caupuri_id"]
+    ]
+    out = translation.merge(stats, on="tucunaca_id", how="left")
+    out["on_volcano"] = out["log2fc"].notna()
+    out["note"] = ""
+    out.loc[out["caupuri_id"].isna(), "note"] = "no Caupuri ortholog in translation table"
+    out.loc[out["caupuri_id"].notna() & ~out["on_volcano"], "note"] = (
+        "not on volcano: TPM = 0 in Tucunaca or Caupuri"
+    )
+    return out
+
+
+def _place_labels(ax, items, fontsize: float = 6.5) -> int:
+    """Greedy non-overlapping label placement in display coordinates.
+
+    items: iterable of (x, y, text). Returns how many labels actually got a slot.
+    """
+    ax.figure.canvas.draw()
+    scale = ax.figure.dpi / 72.0
+    offsets = []
+    for dy in (5, -11, 17, -23, 29, -35, 41, -47):
+        offsets.append((4, dy, "left"))
+        offsets.append((-4, dy, "right"))
+    offsets += [(22, 5, "left"), (-22, 5, "right"), (40, 5, "left"), (-40, 5, "right"),
+                (0, 5, "center"), (0, -11, "center"), (0, 17, "center"), (0, -23, "center")]
+
+    placed, used = [], 0
+    for x, y, txt in items:
+        px, py = ax.transData.transform((x, y))
+        w, h = len(txt) * fontsize * 0.62 * scale, fontsize * 1.35 * scale
+        for dx, dy, ha in offsets:
+            dx_px, dy_px = dx * scale, dy * scale
+            left = px + dx_px if ha == "left" else (px + dx_px - w if ha == "right" else px + dx_px - w / 2)
+            bottom = py + dy_px if dy_px >= 0 else py + dy_px - h
+            box = (left, bottom, left + w, bottom + h)
+            if any(not (box[2] < b[0] or box[0] > b[2] or box[3] < b[1] or box[1] > b[3])
+                   for b in placed):
+                continue
+            placed.append(box)
+            ax.annotate(txt, (x, y), fontsize=fontsize, alpha=0.95,
+                        xytext=(dx, dy), textcoords="offset points", ha=ha,
+                        va="bottom" if dy >= 0 else "top",
+                        bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                                  ec="none", alpha=0.65),
+                        annotation_clip=True)
+            used += 1
+            break
+    return used
+
+
+def make_boltz_protein_plot(merged: pd.DataFrame, boltz: pd.DataFrame,
+                            fc_cutoff: float, pval_cutoff: float) -> Path:
+    """Volcano plot where every Boltz-validated Tucunaca protein is coloured by enzyme class."""
+    plotted = boltz.loc[boltz["plot_class"].isin(BOLTZ_CLASS_COLORS)]
+
+    fig, (ax, ax_table) = plt.subplots(1, 2, figsize=(19, 9),
+                                       gridspec_kw={"width_ratios": [1.7, 1]})
+
+    ax.scatter(merged["log2fc"], merged["neg_log10_p"],
+               c="lightgray", s=10, alpha=0.35, label=f"all genes (n={len(merged)})")
+
+    labels = []
+    for cls in BOLTZ_CLASS_PRIORITY:
+        rows = plotted.loc[plotted["plot_class"] == cls].drop_duplicates("tucunaca_id")
+        if rows.empty:
+            continue
+        color = BOLTZ_CLASS_COLORS[cls]
+        ax.scatter(rows["log2fc"], rows["neg_log10_p"],
+                   c=color, s=48, alpha=0.9, edgecolors="black", linewidths=0.5,
+                   zorder=5, label=f"{BOLTZ_CLASS_LABELS[cls]} (n={len(rows)})")
+        # label the strictosidine hits plus the two most extreme genes of every other class
+        ranked = rows.dropna(subset=["neg_log10_p"]).sort_values("neg_log10_p", ascending=False)
+        keys = ranked if cls == "stricto" else ranked.head(2)
+        labels.extend((r["log2fc"], r["neg_log10_p"], r["tucunaca_id"].split("G")[-1])
+                      for _, r in keys.iterrows())
+
+    ax.axvline(-fc_cutoff, color="gray", linestyle="--", linewidth=0.8)
+    ax.axvline(fc_cutoff, color="gray", linestyle="--", linewidth=0.8)
+    ax.axhline(pval_cutoff, color="gray", linestyle="--", linewidth=0.8)
+    n_labels = _place_labels(ax, labels)
+    ax.set_xlabel("log2 fold change (Tucunaca / Caupuri)")
+    ax.set_ylabel("-log10(p-value)")
+    ax.set_title("Boltz-validated pathway proteins on the\nTucunaca vs Caupuri volcano plot", fontsize=12)
+
+    genes_all = plotted.drop_duplicates("tucunaca_id")
+    n_drawn = int(genes_all["on_volcano"].sum())
+    n_no_expr = len(genes_all) - n_drawn
+    n_shared = int((plotted.groupby("tucunaca_id")["protein_class"].nunique() > 1).sum())
+    ax.legend(loc="upper left", markerscale=1.6, fontsize=8, framealpha=0.9)
+
+    # ---- per-class summary table ----
+    rows = []
+    for cls in BOLTZ_CLASS_PRIORITY:
+        sub = plotted.loc[plotted["plot_class"] == cls]
+        if sub.empty:
+            continue
+        genes = sub.drop_duplicates("tucunaca_id")
+        on = genes.loc[genes["on_volcano"]]
+        sig = on.loc[on["neg_log10_p"] >= pval_cutoff]
+        up = int((on["log2fc"] >= fc_cutoff).sum())
+        rows.append([
+            BOLTZ_CLASS_LABELS[cls],
+            str(len(genes)),
+            str(len(genes) - len(on)),
+            f"{len(on.loc[on['log2fc'] >= fc_cutoff])} / {len(on.loc[on['log2fc'] <= -fc_cutoff])}",
+            str(len(sig)),
+            f"{on['log2fc'].median():+.2f}" if len(on) else "-",
+            str(int(genes["caupuri_id"].notna().sum())),
+        ])
+
+    ax_table.axis("off")
+    tbl = ax_table.table(
+        cellText=rows,
+        colLabels=["Boltz protein class", "Tuc\ngenes", "no\nexpr.", "FC\n+/-", "sig.",
+                   "median\nlog2FC", "Caupuri\northolog"],
+        cellLoc="center", loc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(8)
+    tbl.scale(1, 1.9)
+    for (row, _), cell in tbl.get_celld().items():
+        cell.PAD = 0.04
+        if row == 0:
+            cell.set_text_props(weight="bold")
+        elif row - 1 < len(rows):
+            cell.get_text().set_color(_class_color(rows[row - 1][0]))
+    ax_table.set_title("Boltz-validated proteins per enzyme class\n(Tucunaca)", fontsize=11,
+                       fontweight="bold", pad=14)
+    fig.text(0.62, 0.045,
+             f"{n_drawn} of {len(genes_all)} Boltz-validated Tucunaca proteins are drawn; {n_no_expr} are "
+             f"omitted (no Caupuri ortholog or TPM = 0).\n{n_shared} proteins are predicted as more than one "
+             f"class and are drawn under the first class in the key (all classes kept in the CSV).\n"
+             f"Point labels: the {n_labels} strictosidine hits plus the 2 most extreme genes of every other "
+             f"class (numbers after 'G'). Full table: {Path(OUTPUT_CSV_BOLTZ).name}",
+             fontsize=7.5, color="dimgray", ha="center")
+
+    plt.tight_layout(rect=(0, 0.07, 1, 1))
+    plt.savefig(OUTPUT_PNG_BOLTZ, dpi=300, bbox_inches="tight")
+    plt.close()
+    return OUTPUT_PNG_BOLTZ
+
+
+def _class_color(label: str) -> str:
+    for key, lbl in BOLTZ_CLASS_LABELS.items():
+        if lbl == label:
+            return BOLTZ_CLASS_COLORS[key]
+    return "black"
 
 
 def make_volcano_plot() -> Path:
@@ -433,6 +656,14 @@ def make_volcano_plot() -> Path:
     plt.tight_layout()
     plt.savefig(OUTPUT_PNG_TOP10, dpi=300, bbox_inches="tight")
     plt.close()
+
+    # ---- Boltz-validated proteins coloured by enzyme class ----
+    translation = _annotate_boltz(merged, load_boltz_translation())
+    translation.to_csv(OUTPUT_CSV_BOLTZ, index=False)
+    n_genes = translation["tucunaca_id"].nunique()
+    print(f"Saved {len(translation)} Boltz protein/gene rows ({n_genes} genes) to {OUTPUT_CSV_BOLTZ}")
+    make_boltz_protein_plot(merged, translation, fc_cutoff, pval_cutoff)
+    print(f"Saved Boltz volcano plot to {OUTPUT_PNG_BOLTZ}")
 
     return OUTPUT_PNG
 

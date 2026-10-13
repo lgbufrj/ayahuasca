@@ -1,0 +1,362 @@
+compounds:
+  aspartate:
+    name: L-Aspartic acid
+    pubchem_id: '5960'
+    charge: 0
+  oxoglutarate:
+    name: 2-Oxoglutaric acid
+    pubchem_id: '51'
+    charge: 0
+  oxaloacetate:
+    name: Oxaloacetic acid
+    pubchem_id: '970'
+    charge: 0
+  glutamate:
+    name: L-Glutamic acid
+    pubchem_id: '33032'
+    charge: 0
+  tyrosine:
+    name: L-Tyrosine
+    pubchem_id: '6057'
+    charge: 0
+  hpp:
+    name: 4-Hydroxyphenylpyruvic acid
+    pubchem_id: '979'
+    charge: 0
+  leucine:
+    name: L-Leucine
+    pubchem_id: '6106'
+    charge: 0
+  ketoleucine:
+    name: 4-Methyl-2-oxopentanoic acid
+    pubchem_id: '70'
+    charge: 0
+  plp:
+    name: Pyridoxal 5-phosphate
+    pubchem_id: '1051'
+    charge: 0
+  serine:
+    name: L-Serine
+    pubchem_id: '5951'
+    charge: 0
+  acetyl_coa:
+    name: Acetyl-CoA
+    pubchem_id: '444493'
+    charge: 0
+  oas:
+    name: O-Acetyl-L-serine
+    pubchem_id: '99478'
+    charge: 0
+  coa:
+    name: Coenzyme A
+    pubchem_id: '87642'
+    charge: 0
+  cysteine:
+    name: L-Cysteine
+    pubchem_id: '5862'
+    charge: 0
+  h2s:
+    name: Hydrogen sulfide
+    pubchem_id: '402'
+    charge: 0
+  thiosulfate:
+    name: Thiosulfate
+    pubchem_id: '1084'
+    charge: 0
+  s_sulfocysteine:
+    name: S-Sulfo-L-cysteine
+    pubchem_id: '115015'
+    charge: 0
+  acetate:
+    name: Acetic acid
+    pubchem_id: '176'
+    charge: 0
+  atp:
+    name: ATP
+    pubchem_id: '5957'
+    charge: 0
+  glucys:
+    name: gamma-L-Glutamyl-L-cysteine
+    pubchem_id: '123938'
+    charge: 0
+  adp:
+    name: ADP
+    pubchem_id: '6022'
+    charge: 0
+  phosphate:
+    name: Phosphate
+    pubchem_id: '1061'
+    charge: 0
+  glycine:
+    name: Glycine
+    pubchem_id: '750'
+    charge: 0
+  glutathione:
+    name: Glutathione
+    pubchem_id: '124886'
+    charge: 0
+  methionine:
+    name: L-Methionine
+    pubchem_id: '6137'
+    charge: 0
+  sam:
+    name: SAM
+    pubchem_id: '34755'
+    charge: 0
+  diphosphate:
+    name: Diphosphate
+    pubchem_id: '644102'
+    charge: 0
+  water:
+    name: "H\u2082O"
+    pubchem_id: '962'
+    charge: 0
+organisms:
+  ecoli:
+    species: Escherichia coli K-12 MG1655
+    ncbi_id: '511145'
+    ref: false
+    genome_files:
+      prot:
+        url: https://rest.uniprot.org/uniprotkb/stream?query=proteome:UP000000625&format=fasta&compressed=true
+        compressed: true
+        phased: false
+        final_format: fasta
+        download: false
+  bsubtilis:
+    species: Bacillus subtilis 168
+    ncbi_id: '224308'
+    ref: false
+    genome_files:
+      prot:
+        url: https://rest.uniprot.org/uniprotkb/stream?query=proteome:UP000001570&format=fasta&compressed=true
+        compressed: true
+        phased: false
+        final_format: fasta
+        download: false
+  pseudomonas:
+    species: Pseudomonas aeruginosa PAO1
+    ncbi_id: '208964'
+    ref: false
+    genome_files:
+      prot:
+        url: https://rest.uniprot.org/uniprotkb/stream?query=proteome:UP000002438&format=fasta&compressed=true
+        compressed: true
+        phased: false
+        final_format: fasta
+        download: true
+  yeast:
+    species: Saccharomyces cerevisiae S288C
+    ncbi_id: '559292'
+    ref: false
+    genome_files:
+      prot:
+        url: https://rest.uniprot.org/uniprotkb/stream?query=proteome:UP000002311&format=fasta&compressed=true
+        compressed: true
+        phased: false
+        final_format: fasta
+        download: false
+  arabidopsis:
+    species: Arabidopsis thaliana
+    ncbi_id: '3702'
+    ref: false
+    genome_files:
+      prot:
+        url: https://rest.uniprot.org/uniprotkb/stream?query=proteome:UP000006548&format=fasta&compressed=true
+        compressed: true
+        phased: false
+        final_format: fasta
+        download: false
+  ecoli_ref:
+    species: Escherichia coli K-12 MG1655 (reference templates)
+    ncbi_id: '511145'
+    ref: true
+proteins:
+  aminotransferase:
+    ec_number: 2.6.1.1
+    gene_name: aspC
+    abbreviation: AspC
+    name: Aspartate aminotransferase (family reference; tests AspC/TyrB/IlvE discrimination)
+    oligomerization: 2
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P00509
+        rcsb_id: 1ART
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - aspartate
+      - oxoglutarate
+      products:
+      - oxaloacetate
+      - glutamate
+      smiles: N[C@@H](CC(=O)O)C(=O)O.O=C(O)CCC(=O)C(=O)O>>O=C(O)CC(=O)C(=O)O.N[C@@H](CCC(=O)O)C(=O)O
+      smarts: N[C@@H](CC(=O)O)C(=O)O.O=C(O)CCC(=O)C(=O)O>>O=C(O)CC(=O)C(=O)O.N[C@@H](CCC(=O)O)C(=O)O
+    - id: r1
+      ref: false
+      substrates:
+      - tyrosine
+      - oxoglutarate
+      products:
+      - hpp
+      - glutamate
+      smiles: N[C@@H](Cc1ccc(O)cc1)C(=O)O.O=C(O)CCC(=O)C(=O)O>>O=C(O)C(=O)Cc1ccc(O)cc1.N[C@@H](CCC(=O)O)C(=O)O
+      smarts: N[C@@H](Cc1ccc(O)cc1)C(=O)O.O=C(O)CCC(=O)C(=O)O>>O=C(O)C(=O)Cc1ccc(O)cc1.N[C@@H](CCC(=O)O)C(=O)O
+    - id: r2
+      ref: false
+      substrates:
+      - leucine
+      - oxoglutarate
+      products:
+      - ketoleucine
+      - glutamate
+      smiles: CC(C)C[C@@H](N)C(=O)O.O=C(O)CCC(=O)C(=O)O>>CC(C)CC(=O)C(=O)O.N[C@@H](CCC(=O)O)C(=O)O
+      smarts: CC(C)C[C@@H](N)C(=O)O.O=C(O)CCC(=O)C(=O)O>>CC(C)CC(=O)C(=O)O.N[C@@H](CCC(=O)O)C(=O)O
+    cofactors:
+    - plp
+    compartment: cytoplasm
+  oass:
+    ec_number: 2.5.1.47
+    gene_name: cysK
+    abbreviation: CysK
+    name: O-acetylserine sulfhydrylase / cysteine synthase (tests CysK/CysM discrimination)
+    oligomerization: 2
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P0ABK5
+        rcsb_id: 5J5V
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - oas
+      - h2s
+      products:
+      - cysteine
+      - acetate
+      smiles: CC(=O)OC[C@@H](N)C(=O)O.S>>N[C@@H](CS)C(=O)O.CC(=O)O
+      smarts: CC(=O)OC[C@@H](N)C(=O)O.S>>N[C@@H](CS)C(=O)O.CC(=O)O
+    - id: r1
+      ref: false
+      substrates:
+      - oas
+      - thiosulfate
+      products:
+      - s_sulfocysteine
+      - acetate
+      smiles: CC(=O)OC[C@@H](N)C(=O)O.OS(=O)(=S)O>>N[C@@H](CSS(=O)(=O)O)C(=O)O.CC(=O)O
+      smarts: CC(=O)OC[C@@H](N)C(=O)O.OS(=O)(=S)O>>N[C@@H](CSS(=O)(=O)O)C(=O)O.CC(=O)O
+    cofactors:
+    - plp
+    compartment: cytoplasm
+  cyse:
+    ec_number: 2.3.1.30
+    gene_name: cysE
+    abbreviation: CysE
+    name: Serine acetyltransferase
+    oligomerization: 6
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P0A9D4
+        rcsb_id: 1T3D
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - serine
+      - acetyl_coa
+      products:
+      - oas
+      - coa
+      smiles: N[C@@H](CO)C(=O)O.CC(=O)SCCNC(=O)CCNC(=O)[C@@H](O)C(C)(C)COP(=O)(O)OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O>>CC(=O)OC[C@@H](N)C(=O)O.CC(C)(COP(=O)(O)OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O)[C@@H](O)C(=O)NCCC(=O)NCCS
+      smarts: N[C@@H](CO)C(=O)O.CC(=O)SCCNC(=O)CCNC(=O)[C@@H](O)C(C)(C)COP(=O)(O)OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O>>CC(=O)OC[C@@H](N)C(=O)O.CC(C)(COP(=O)(O)OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O)[C@@H](O)C(=O)NCCC(=O)NCCS
+    cofactors: []
+    compartment: cytoplasm
+  gsha:
+    ec_number: 6.3.2.2
+    gene_name: gshA
+    abbreviation: GshA
+    name: Glutamate--cysteine ligase
+    oligomerization: 1
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P0A6W9
+        rcsb_id: 1V4G
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - glutamate
+      - cysteine
+      - atp
+      products:
+      - glucys
+      - adp
+      - phosphate
+      smiles: N[C@@H](CCC(=O)O)C(=O)O.N[C@@H](CS)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O>>N[C@@H](CCC(=O)N[C@@H](CS)C(=O)O)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.OP(=O)(O)O
+      smarts: N[C@@H](CCC(=O)O)C(=O)O.N[C@@H](CS)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O>>N[C@@H](CCC(=O)N[C@@H](CS)C(=O)O)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.OP(=O)(O)O
+    cofactors: []
+    compartment: cytoplasm
+  gshb:
+    ec_number: 6.3.2.3
+    gene_name: gshB
+    abbreviation: GshB
+    name: Glutathione synthetase
+    oligomerization: 4
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P04425
+        rcsb_id: 1GSA
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - glucys
+      - glycine
+      - atp
+      products:
+      - glutathione
+      - adp
+      - phosphate
+      smiles: N[C@@H](CCC(=O)N[C@@H](CS)C(=O)O)C(=O)O.NCC(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O>>N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.OP(=O)(O)O
+      smarts: N[C@@H](CCC(=O)N[C@@H](CS)C(=O)O)C(=O)O.NCC(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O>>N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.OP(=O)(O)O
+    cofactors: []
+    compartment: cytoplasm
+  metk:
+    ec_number: 2.5.1.6
+    gene_name: metK
+    abbreviation: MetK
+    name: S-adenosylmethionine synthase
+    oligomerization: 4
+    oois:
+    - pseudomonas
+    organisms:
+      ecoli_ref:
+        uniprot_id: P0A817
+        rcsb_id: 1RG9
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - methionine
+      - atp
+      - water
+      products:
+      - sam
+      - phosphate
+      - diphosphate
+      smiles: CSCC[C@@H](N)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.O>>C[S@@+](CC[C@H](N)C(=O)[O-])C[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1O.OP(=O)(O)O.OP(=O)(O)OP(=O)(O)O
+      smarts: CSCC[C@@H](N)C(=O)O.Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O.O>>C[S@@+](CC[C@H](N)C(=O)[O-])C[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1O.OP(=O)(O)O.OP(=O)(O)OP(=O)(O)O
+    cofactors: []
+    compartment: cytoplasm

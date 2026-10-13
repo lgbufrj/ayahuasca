@@ -7,7 +7,7 @@ import subprocess
 import data
 import os
 
-GENOME_TYPES = ["phased", "non_phased"]
+GENOME_TYPES = ["non_phased", "phased"]
 SEQUENCE_TYPES = ["cds", "prot"]
 
 organisms = [org if data.organisms[org]["ref"]==False else None for org in data.organisms]
@@ -22,6 +22,10 @@ for organism in organisms:
             # Paths
             genome_fasta_path = f"{data.GENOME_PATH}/{organism}/{genome_type}/{sequence_type}.fasta"
             blast_db_path = f"{data.GENOME_PATH}/{organism}/{genome_type}/blast/{sequence_type}_{genome_type}_db"
+
+            if not os.path.isfile(genome_fasta_path):
+                print(f"Skipping {organism}/{genome_type}/{sequence_type}: {genome_fasta_path} not found")
+                continue
 
             # Create necessary directories
             os.makedirs(os.path.dirname(blast_db_path), exist_ok=True)    

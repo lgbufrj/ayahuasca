@@ -11,7 +11,9 @@ except Exception:
     jsonschema = None
 
 
+# CURRENT_PROJECT = "benchmark"
 CURRENT_PROJECT = "harmine_biosynthesis"
+# CURRENT_PROJECT = "yuremamine_biosynthesis"
 
 BASE_PATH = "/home/pedro/Desktop/projects/ayahuasca"
 
@@ -93,13 +95,18 @@ databases = {
     "metacyc": {"name": "MetaCyc", "url": "https://metacyc.org"}
 }
 
+
+DEFAULT_TEMPERATURE_C = 25  # Celsius
+DEFAULT_TEMPERATURE = 273.15 + DEFAULT_TEMPERATURE_C  # Kelvin
+DEFAULT_PRESSURE = 1.0  # atm
+
 # Intracellular compartments
 compartments = {
-    "cytoplasm": {"name": "Cytoplasm", "pH": 7.2, "ionic_strength": 0.15, "temperature": 298.15},
-    "vacuole": {"name": "Vacuole", "pH": 5.5, "ionic_strength": 0.1, "temperature": 298.15},
-    "apoplast": {"name": "Apoplast", "pH": 5.0, "ionic_strength": 0.1, "temperature": 298.15},
-    "chloroplast": {"name": "Chloroplast", "pH": 8.0, "ionic_strength": 0.1, "temperature": 298.15},
-    "mitochondrion": {"name": "Mitochondrion", "pH": 7.8, "ionic_strength": 0.15, "temperature": 298.15},
+    "cytoplasm": {"name": "Cytoplasm", "pH": 7.2, "ionic_strength": 0.15, "temperature": DEFAULT_TEMPERATURE},
+    "vacuole": {"name": "Vacuole", "pH": 5.5, "ionic_strength": 0.1, "temperature": DEFAULT_TEMPERATURE},
+    "apoplast": {"name": "Apoplast", "pH": 5.0, "ionic_strength": 0.1, "temperature": DEFAULT_TEMPERATURE},
+    "chloroplast": {"name": "Chloroplast", "pH": 8.0, "ionic_strength": 0.1, "temperature": DEFAULT_TEMPERATURE},
+    "mitochondrion": {"name": "Mitochondrion", "pH": 7.8, "ionic_strength": 0.15, "temperature": DEFAULT_TEMPERATURE},
 }
 
 compounds = pathways[CURRENT_PROJECT].get("compounds", {})

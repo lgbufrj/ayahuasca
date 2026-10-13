@@ -1,13 +1,14 @@
 from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 from pandas import read_csv
 from collections import defaultdict
 import os
 import sys
 from data import proteins, organisms, PROTEINS_PATH, GENOME_PATH
-from helper_functions import format_fasta_description
+from helper_functions import format_fasta_description, sequence_key
 
 OVERWRITE = "--overwrite" in sys.argv
-GENOME_TYPE = "phased"
+GENOME_TYPE = "non_phased"
 for i, arg in enumerate(sys.argv):
     if arg in ("--genome-type", "-g") and i + 1 < len(sys.argv):
         GENOME_TYPE = sys.argv[i + 1]
@@ -30,6 +31,12 @@ def extract_ids_from_csv(list_file):
     except:
         return []
 
+def read_cached_records(path):
+    records = list(SeqIO.parse(path, "fasta"))
+    if any(not rec.id for rec in records):
+        return None
+    return records
+
 print("Extracting ids...")
 
 prot = get_protein_organisms(proteins)
@@ -42,31 +49,53 @@ for prot_name, species, fasta_name in prot:
         blast_res_path = f"{PROTEINS_PATH}/{prot_name}/analysis/genomic/blast/{ooi}/{species}/{fasta_name}_blast_filtered.fasta"
 
         if os.path.exists(blast_res_path) and not OVERWRITE:
-            print(f"Skipping {ooi} {species} {fasta_name}...")
-            blast_recs = list(SeqIO.parse(blast_res_path, "fasta"))
+            cached_recs = read_cached_records(blast_res_path)
+            if cached_recs is not None:
+                print(f"Skipping {ooi} {species} {fasta_name}...")
+                blast_recs = cached_recs
+            else:
+                print(f"Cached FASTA for {ooi} {species} {fasta_name} has records without ids, regenerating...")
         else:
+            cached_recs = None
+
+        if cached_recs is None:
             input_csv_path = f"{PROTEINS_PATH}/{prot_name}/analysis/genomic/blast/{ooi}/{species}/{fasta_name}_blast_filtered.csv"
 
             if not os.path.exists(input_csv_path):
                 print(f"Skipping {ooi} {species} {fasta_name}...")
                 continue
 
+            genome_prot_path = f"{GENOME_PATH}/{ooi}/{GENOME_TYPE}/prot.fasta"
+            if not os.path.exists(genome_prot_path):
+                print(f"Skipping {ooi} {species} {fasta_name}: {genome_prot_path} not found")
+                continue
+
             print(f"Extracting seqs for {prot_name} in {ooi} x {species}...")
-            ids = extract_ids_from_csv(input_csv_path)[:MAX_RESULTS]
+            ids = [sequence_key(hit_id) for hit_id in extract_ids_from_csv(input_csv_path)[:MAX_RESULTS]]
+            ids = [hit_id for hit_id in ids if hit_id]
             if ids == []: continue
 
-            seq_by_id = {
-                rec.id.split("|")[0]: rec
-                for rec in SeqIO.parse(f"{GENOME_PATH}/{ooi}/{GENOME_TYPE}/prot.fasta", "fasta")
-            }
+            seq_by_id = {}
+            for rec in SeqIO.parse(genome_prot_path, "fasta"):
+                key = sequence_key(rec.id)
+                if key:
+                    seq_by_id.setdefault(key, rec)
 
             blast_recs = []
+            seen = set()
             for seq_id in ids:
                 seq_record = seq_by_id.get(seq_id)
-                if seq_record:
-                    seq_record.id = format_fasta_description(seq_record.description, description_only=True)
-                    seq_record.description = ""
-                    blast_recs.append(seq_record)
+                if seq_record is None or seq_id in seen:
+                    continue
+                seen.add(seq_id)
+                _, new_id, _name, _td, _sp, _chr_ = format_fasta_description(seq_record.description)
+                if not new_id:
+                    print(f"  Warning: skipping {seq_id}, no usable id in '{seq_record.description}'")
+                    continue
+                blast_recs.append(SeqRecord(seq_record.seq, id=new_id, description=""))
+
+            if not blast_recs:
+                print(f"  Warning: no genome sequence matched {len(ids)} hit id(s) for {fasta_name}; regenerate the CSV with filter_blast_results.py --overwrite")
 
             SeqIO.write(blast_recs, blast_res_path, "fasta")
 

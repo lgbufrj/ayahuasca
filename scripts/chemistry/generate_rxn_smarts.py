@@ -70,7 +70,11 @@ def build_smiles_map(compounds_dir):
 
         # Example:
         # harmol_68094.sdf -> harmol
-        compound_name = sdf_file.stem.split("_")[0].lower()
+        compound_name = sdf_file.stem.split("_")
+        if len(compound_name) > 1:
+            compound_name = "_".join(compound_name[:-1])
+        else:
+            compound_name = compound_name[0]
 
         try:
 
@@ -175,8 +179,8 @@ for yaml_file in yaml_files:
 
             reaction_id = reaction.get("id", "unknown")
 
-            # Skip existing smiles
-            if "smiles" in reaction:
+            # Skip existing smarts
+            if "smarts" in reaction:
                 skipped += 1
                 continue
 
@@ -188,7 +192,7 @@ for yaml_file in yaml_files:
                     smiles_map
                 )
 
-                reaction["smiles"] = rxn_smiles
+                reaction["smarts"] = rxn_smiles
 
                 updated += 1
 

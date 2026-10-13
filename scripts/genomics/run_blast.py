@@ -70,9 +70,10 @@ class BlastJob:
     out_path:    Path
 
     # Populated after execution
-    status:   JobStatus = field(default=JobStatus.PENDING, compare=False)
-    duration: float     = field(default=0.0,               compare=False)
-    error:    str       = field(default="",                compare=False)
+    status:      JobStatus = field(default=JobStatus.PENDING, compare=False)
+    duration:    float     = field(default=0.0,               compare=False)
+    error:       str       = field(default="",                compare=False)
+    skip_reason: str       = field(default="",                compare=False)
 
     @property
     def label(self) -> str:
@@ -101,21 +102,28 @@ def _target_organisms() -> list[str]:
     ]
 
 
-def _db_path(organism: str, genome_type: str) -> Path:
+def _db_path(organism: str, genome_type: str) -> Path | None:
+    """BLAST db prefix for this organism, or None when it has no such genome."""
     meta = organisms[organism]
     if genome_type == "phased":
         if not meta.get("genome_files", {}).get("prot", {}).get("phased"):
-            raise ValueError(
-                f"Organism '{organism}' has no phased genome. "
-                f"Use --genome-type non_phased."
-            )
+            return None
         return Path(GENOME_PATH) / organism / "phased"     / "blast" / "prot_phased_db"
     return     Path(GENOME_PATH) / organism / "non_phased" / "blast" / "prot_non_phased_db"
 
 
-def discover_jobs(*, genome_type: str = "phased") -> list[BlastJob]:
-    """Build the full list of BLASTP jobs from the data dictionaries."""
+def _db_exists(db_path: Path) -> bool:
+    """makeblastdb writes the prefix plus index files; check the indexes."""
+    return any(
+        Path(f"{db_path}{ext}").exists()
+        for ext in (".pin", ".phr", ".psq", ".pdb")
+    )
+
+
+def discover_jobs(*, genome_type: str = "non_phased") -> list[BlastJob]:
+    """Build the list of BLASTP jobs, skipping organisms without that genome."""
     jobs: list[BlastJob] = []
+    missing_genome: dict[str, str] = {}
 
     for prot_name, species, fasta_name in _iter_ref_proteins():
         query_path = (
@@ -125,6 +133,11 @@ def discover_jobs(*, genome_type: str = "phased") -> list[BlastJob]:
         )
 
         for organism in _target_organisms():
+            db_path = _db_path(organism, genome_type)
+            if db_path is None:
+                missing_genome[organism] = f"no {genome_type} genome"
+                continue
+
             out_path = (
                 Path(PROTEINS_PATH)
                 / prot_name / "analysis" / "genomic" / "blast"
@@ -140,10 +153,13 @@ def discover_jobs(*, genome_type: str = "phased") -> list[BlastJob]:
                     organism    = organism,
                     genome_type = genome_type,
                     query_path  = query_path,
-                    db_path     = _db_path(organism, genome_type),
+                    db_path     = db_path,
                     out_path    = out_path,
                 )
             )
+
+    for organism, reason in missing_genome.items():
+        log.warning("skip  organism %s — %s", organism, reason)
 
     return jobs
 
@@ -169,16 +185,24 @@ def run_job(
     with its status, duration, and error fields populated.
     """
     # ── Already done? ────────────────────────────────────────────────────────
-    if job.out_path.exists() and not overwrite:
+    # A zero-byte output is a failed run (blastp creates the file before it
+    # validates the db), so it must not count as done.
+    if job.out_path.exists() and not overwrite and job.out_path.stat().st_size > 0:
         log.debug("skip  %s (output exists)", job.label)
         job.status = JobStatus.SKIPPED
         return job
 
     # ── Validate inputs ──────────────────────────────────────────────────────
+    missing: list[str] = []
     if not job.query_path.exists():
-        job.status = JobStatus.FAILED
-        job.error  = f"Query file not found: {job.query_path}"
-        log.error("%s — %s", job.label, job.error)
+        missing.append(f"query {job.query_path}")
+    if not _db_exists(job.db_path):
+        missing.append(f"db {job.db_path}.* (run make_blast_db.py)")
+
+    if missing:
+        job.status      = JobStatus.SKIPPED
+        job.skip_reason = f"missing {' and '.join(missing)}"
+        log.warning("skip  %s — %s", job.label, job.skip_reason)
         return job
 
     # ── Prepare output directory ─────────────────────────────────────────────
@@ -286,6 +310,7 @@ def print_summary(jobs: list[BlastJob]) -> None:
         counts[job.status] += 1
 
     failed = [j for j in jobs if j.status == JobStatus.FAILED]
+    skipped = [j for j in jobs if j.status == JobStatus.SKIPPED and j.skip_reason]
     total_time = sum(j.duration for j in jobs)
 
     width = 60
@@ -299,6 +324,12 @@ def print_summary(jobs: list[BlastJob]) -> None:
     print(f"  {GREY}{'Skipped':<20}{RESET} {counts[JobStatus.SKIPPED]}")
     print(f"  {RED}{'Failed':<20}{RESET} {counts[JobStatus.FAILED]}")
     print(f"  {'Wall time':<20} {total_time:.1f}s")
+
+    if skipped:
+        print(f"\n{GREY}{BOLD}  Skipped (missing inputs):{RESET}")
+        for j in skipped:
+            print(f"    {GREY}–{RESET}  {j.label}")
+            print(f"       {GREY}{j.skip_reason[:120]}{RESET}")
 
     if failed:
         print(f"\n{RED}{BOLD}  Failed jobs:{RESET}")
@@ -342,7 +373,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--genome-type", "-g",
         choices=["phased", "non_phased"],
-        default="phased",
+        default="non_phased",
         help="Which genome assembly to query against",
     )
     p.add_argument(

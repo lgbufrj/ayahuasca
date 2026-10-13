@@ -7,10 +7,42 @@ compounds:
     name: DMT
     pubchem_id: '6089'
     charge: 0
-  gallocatechin:
-    name: Gallocatechin
-    pubchem_id: '65084'
+  leucorobinetinidin:
+    name: Leucorobinetinidin
+    pubchem_id: '0'
     charge: 0
+  h2o:
+    name: "H\u2082O"
+    pubchem_id: '962'
+    charge: 0
+  tryptophan:
+    name: Tryptophan
+    pubchem_id: '6305'
+    charge: 0
+  tryptamine:
+    name: Tryptamine
+    pubchem_id: '1150'
+    charge: 0
+  secologanin:
+    name: Secologanin
+    pubchem_id: '161276'
+    charge: 0
+  strictosidine:
+    name: Strictosidine
+    pubchem_id: '161336'
+    charge: 0
+  dmapp:
+    name: DMAPP
+    pubchem_id: '647'
+    charge: 0
+  dmtrp:
+    name: 7-dimethylallyltryptophan
+    pubchem_id: '45479458'
+    charge: 0
+  pp:
+    name: Pyrophosphate
+    pubchem_id: '644102'
+    charge: -4
 organisms:
   yurema:
     species: Mimosa tenuiflora
@@ -28,21 +60,91 @@ organisms:
         compressed: true
         phased: false
         final_format: fasta
-        download: true
+        download: false
       prot:
         url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome.faa.gz
         compressed: true
         phased: false
         final_format: fasta
-        download: true
+        download: false
       rnaseq_short:
         url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam1.bam
         compressed: false
         final_format: bam
-        download: false
+        download: true
       rnaseq_long:
         url: https://plantgenomics.ncc.unesp.br/Genomes/Mimosas/JuremaPreta/genome-bam2.bam
         compressed: false
         final_format: bam
         download: false
-proteins: {}
+  arabidopsis:
+    species: Arabidopsis thaliana
+    ncbi_id: '3702'
+    ref: true
+  aspergillus:
+    species: Aspergillus fumigatus
+    ncbi_id: ''
+    ref: true
+proteins:
+  dmats:
+    ec_number: ''
+    gene_name: dmaW
+    abbreviation: DMATS
+    name: Tryptophan dimethylallyltransferase
+    oois:
+    - yurema
+    organisms:
+      aspergillus:
+        uniprot_id: Q50EL0
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - tryptophan
+      - dmapp
+      products:
+      - dmtrp
+      - pp
+      smarts: '[H]OC(=O)[C@@]([H])(N([H])[H])C([H])([H])c1c([H])n([H])c2c([H])c([H])c([H])c([H])c12.[H]OP(=O)(O[H])O[P@](=O)(O[H])OC([H])([H])C([H])=C(C([H])([H])[H])C([H])([H])[H]>>[H]OC(=O)[C@@]([H])(N([H])[H])C([H])([H])c1c([H])n([H])c2c(C([H])([H])C([H])=C(C([H])([H])[H])C([H])([H])[H])c([H])c([H])c([H])c12.O=P([O-])([O-])OP(=O)([O-])[O-]'
+    - id: r1
+      ref: false
+      substrates:
+      - leucorobinetinidin
+      - dmt
+      products:
+      - yuremamine
+      - h2o
+      smarts: '[H]Oc1c([H])c([H])c2c(c1[H])O[C@]([H])(c1c([H])c(O[H])c(O[H])c(O[H])c1[H])[C@@]([H])(O[H])[C@]2([H])O[H].[H]c1c([H])c([H])c2c(c1[H])c(C([H])([H])C([H])([H])N(C([H])([H])[H])C([H])([H])[H])c([H])n2[H]>>[H]Oc1c([H])c([H])c2c(c1[H])O[C@@]([H])(c1c([H])c(O[H])c(O[H])c(O[H])c1[H])[C@]([H])(O[H])[C@]2([H])c1c(C([H])([H])C([H])([H])N(C([H])([H])[H])C([H])([H])[H])c2c([H])c([H])c([H])c([H])c2n1[H].O'
+    cofactors: []
+    compartment: cytoplasm
+  stricto:
+    ec_number: ''
+    gene_name: str
+    abbreviation: STS
+    name: Strictosidine synthase
+    oois:
+    - yurema
+    organisms:
+      arabidopsis:
+        uniprot_id: P94111
+    reactions:
+    - id: rr
+      ref: true
+      substrates:
+      - tryptamine
+      - secologanin
+      products:
+      - strictosidine
+      - h2o
+      smarts: '[H]c1c([H])c([H])c2c(c1[H])c(C([H])([H])C([H])([H])N([H])[H])c([H])n2[H].[H]OC([H])([H])[C@@]1([H])O[C@@]([H])(O[C@]2([H])OC([H])=C(C(=O)OC([H])([H])[H])[C@@]([H])(C([H])([H])C([H])=O)[C@@]2([H])C([H])=C([H])[H])[C@]([H])(O[H])[C@@]([H])(O[H])[C@]1([H])O[H]>>[H]OC([H])([H])[C@@]1([H])O[C@@]([H])(O[C@]2([H])OC([H])=C(C(=O)OC([H])([H])[H])[C@@]([H])(C([H])([H])[C@@]3([H])c4c(c5c([H])c([H])c([H])c([H])c5n4[H])C([H])([H])C([H])([H])N3[H])[C@@]2([H])C([H])=C([H])[H])[C@]([H])(O[H])[C@@]([H])(O[H])[C@]1([H])O[H].[H]O[H]'
+    - id: r1
+      ref: false
+      substrates:
+      - leucorobinetinidin
+      - dmt
+      products:
+      - yuremamine
+      - h2o
+      smarts: '[H]Oc1c([H])c([H])c2c(c1[H])O[C@]([H])(c1c([H])c(O[H])c(O[H])c(O[H])c1[H])[C@@]([H])(O[H])[C@]2([H])O[H].[H]c1c([H])c([H])c2c(c1[H])c(C([H])([H])C([H])([H])N(C([H])([H])[H])C([H])([H])[H])c([H])n2[H]>>[H]Oc1c([H])c([H])c2c(c1[H])O[C@@]([H])(c1c([H])c(O[H])c(O[H])c(O[H])c1[H])[C@]([H])(O[H])[C@]2([H])c1c(C([H])([H])C([H])([H])N(C([H])([H])[H])C([H])([H])[H])c2c([H])c([H])c([H])c([H])c2n1[H].O'
+    cofactors: []
+    compartment: vacuole

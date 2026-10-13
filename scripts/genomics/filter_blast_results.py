@@ -13,7 +13,7 @@ from data import (
 )
 from helper_functions import format_fasta_description
 
-EXPECT_CUTOFF = 1e-20
+EXPECT_CUTOFF = 1e-06
 COVERAGE_CUTOFF = 50
 MAX_LENGTH_MULTIPLIER = 2
 OVERWRITE = "--overwrite" in sys.argv
@@ -41,13 +41,15 @@ TRANSCRIPTOME_FILENAMES: dict[str, str] = {
 }
 
 
-def load_abundances(organism: str) -> dict[str, dict[str, float]]:
+def abundance_path(organism: str) -> str | None:
     filename = TRANSCRIPTOME_FILENAMES.get(organism)
     if not filename:
-        return {}
-    ab_path = f"{TRANSCRIPTOME_PATH}/{organism}/{filename}"
-    if not os.path.exists(ab_path):
-        return {}
+        return None
+    path = f"{TRANSCRIPTOME_PATH}/{organism}/{filename}"
+    return path if os.path.isfile(path) else None
+
+
+def load_abundances(ab_path: str) -> dict[str, dict[str, float]]:
     abundances: dict[str, dict[str, float]] = {}
     with open(ab_path) as f:
         reader = csv.DictReader(f, delimiter="\t")
@@ -62,6 +64,77 @@ def load_abundances(organism: str) -> dict[str, dict[str, float]]:
             except (ValueError, KeyError):
                 pass
     return abundances
+
+
+def filter_queries(
+    blast_records,
+    output_file: str,
+    abundances: dict[str, dict[str, float]],
+    mapping: dict[str, str],
+) -> int:
+    """Write one filtered CSV per query; returns the hit count of the last one."""
+    written = 0
+
+    for blast_record in blast_records:  # cada query no FASTA
+
+        rows = []
+
+        for alignment in blast_record.alignments: # Acessa cada alinhamento dentro do registro BLAST
+            for hsp in alignment.hsps: # Acessa cada HSP (High-scoring Segment Pair) dentro do alinhamento e pode ter múltiplos HSPs
+                if hsp.expect < EXPECT_CUTOFF: # hsp.expect representa o valor E-value e define o corte para menores que 0.001
+                    coverage = (hsp.query_end - hsp.query_start + 1) / blast_record.query_length * 100
+                    if coverage < COVERAGE_CUTOFF:
+                        continue
+
+                    if alignment.length > blast_record.query_length * MAX_LENGTH_MULTIPLIER:
+                        continue
+
+                    new_description, id_, name, td, sp, chr_ = format_fasta_description(alignment.hit_def)
+
+                    # ── Abundance filter ────────────────────────────────
+                    if GENOME_TYPE == "phased":
+                        non_phased_id = mapping.get(id_, "")
+                        lookup_id = non_phased_id.rsplit(".", 1)[0] if non_phased_id else ""
+                    else:
+                        lookup_id = id_.rsplit(".", 1)[0]
+                    ab = abundances.get(lookup_id) if lookup_id else None
+                    if ABUNDANCE_FILTER and abundances and id_:
+
+                        if ab is None:
+                            continue
+
+                        if (
+                            ab["fpkm"] < MIN_FPKM
+                            or ab["tpm"] < MIN_TPM
+                            or ab["coverage"] < MIN_COVERAGE
+                        ):
+                            continue
+
+                    ab = ab or {"fpkm": 0.0, "tpm": 0.0, "coverage": 0.0}
+
+                    rows.append({
+                        'enzyme': (blast_record.query.split() or [""])[0],
+                        'hit_id': id_,
+                        'expect': hsp.expect,
+                        'hit_len': alignment.length,
+                        'bit_score': hsp.bits,
+                        'coverage': round(min(coverage, 100.0), 2),
+                        'identity': round(hsp.identities / alignment.length * 100, 2),
+                        'similarity': round(hsp.positives / alignment.length * 100, 2),
+                        'gaps': hsp.gaps,
+                        'td': td,
+                        'sp': sp,
+                        'chr': chr_,
+                        'fpkm': ab["fpkm"],
+                        'tpm': ab["tpm"],
+                        'ab_coverage': ab["coverage"],
+                        'hit_description': new_description,
+                    })
+
+        pd.DataFrame(rows).to_csv(output_file, sep=';', index=False)
+        written = len(rows)
+
+    return written
 
 
 def load_mapping(map_csv: str) -> dict[str, str]:
@@ -105,11 +178,30 @@ for prot_name, ref_organism, fasta_name in prots:
             print(f"Input file for {ref_organism} {prot_name} against {ooi} does not exist, skipping...")
             continue
 
+        if os.path.getsize(input_file) == 0:
+            print(f"Input file for {ref_organism} {prot_name} against {ooi} is empty (failed BLAST?), skipping...")
+            continue
+
         # ── Load abundance data for this organism ──────────────────────────
         abundances: dict[str, dict[str, float]] = {}
         mapping: dict[str, str] = {}
         if ABUNDANCE_FILTER:
-            abundances = load_abundances(ooi)
+            ab_path = abundance_path(ooi)
+            if ab_path is None:
+                print(
+                    f"Skipping {ref_organism} {prot_name} against {ooi}: "
+                    f"no transcriptome file for --abundance-filter"
+                )
+                continue
+
+            abundances = load_abundances(ab_path)
+            if not abundances:
+                print(
+                    f"Skipping {ref_organism} {prot_name} against {ooi}: "
+                    f"no abundance rows in {ab_path}"
+                )
+                continue
+
             if GENOME_TYPE == "phased":
                 map_csv = (
                     f"{PROTEINS_PATH}/{prot_name}/analysis/genomic/blast"
@@ -118,70 +210,28 @@ for prot_name, ref_organism, fasta_name in prots:
                 mapping = load_mapping(map_csv)
                 if not mapping:
                     print(
-                        f"  Warning: no gene_id_map.csv for phased genome, "
-                        f"abundance filter will be incomplete for {prot_name} / {ooi}"
+                        f"Skipping {ref_organism} {prot_name} against {ooi}: "
+                        f"no gene_id_map.csv for phased genome, "
+                        f"abundance filter cannot be applied"
                     )
+                    continue
 
         with open(input_file) as result:
 
             blast_records = NCBIXML.parse(result)  # Lê o arquivo XML, NCBIXML.parse()retorna um iterador. Em termos simples, um iterador permite percorrer a saída do BLAST, recuperando registros BLAST um por um para cada resultado de pesquisa do BLAST:
 
-            for blast_record in blast_records:  # cada query no FASTA
+            try:
+                n_rows = filter_queries(
+                    blast_records,
+                    output_file,
+                    abundances,
+                    mapping,
+                )
+            except (ValueError, SyntaxError) as exc:
+                print(f"Corrupt BLAST output for {ref_organism} {prot_name} against {ooi}: {exc}")
+                continue
 
-                rows = []
-
-                for alignment in blast_record.alignments: # Acessa cada alinhamento dentro do registro BLAST
-                    for hsp in alignment.hsps: # Acessa cada HSP (High-scoring Segment Pair) dentro do alinhamento e pode ter múltiplos HSPs
-                        if hsp.expect < EXPECT_CUTOFF: # hsp.expect representa o valor E-value e define o corte para menores que 0.001
-                            coverage = (hsp.query_end - hsp.query_start + 1) / blast_record.query_length * 100
-                            if coverage < COVERAGE_CUTOFF:
-                                continue
-
-                            if alignment.length > blast_record.query_length * MAX_LENGTH_MULTIPLIER:
-                                continue
-
-                            new_description, id_, name, td, sp, chr_ = format_fasta_description(alignment.hit_def)
-                            
-                            # if ".1" not in id_: continue
-
-                            # ── Abundance filter ────────────────────────────────
-                            if GENOME_TYPE == "phased":
-                                non_phased_id = mapping.get(id_, "")
-                                lookup_id = non_phased_id.rsplit(".", 1)[0] if non_phased_id else ""
-                            else:
-                                lookup_id = id_.rsplit(".", 1)[0]
-                            ab = abundances.get(lookup_id) if lookup_id else None
-                            if ABUNDANCE_FILTER and abundances and id_:
-
-                                if ab is not None:
-                                    if (
-                                        ab["fpkm"] < MIN_FPKM
-                                        or ab["tpm"] < MIN_TPM
-                                        or ab["coverage"] < MIN_COVERAGE
-                                    ):
-                                        continue
-
-                            rows.append({
-                                'enzyme': blast_record.query.split()[0],
-                                'hit_id': id_,
-                                'expect': hsp.expect,
-                                'hit_len': alignment.length,
-                                'bit_score': hsp.bits,
-                                'coverage': round(min(coverage, 100.0), 2),
-                                'identity': round((hsp.identities / alignment.length) * 100, 2),
-                                'similarity': round((hsp.positives / alignment.length) * 100, 2),
-                                'gaps': hsp.gaps,
-                                'td': td,
-                                'sp': sp,
-                                'chr': chr_,
-                                'fpkm': ab["fpkm"],
-                                'tpm': ab["tpm"],
-                                'ab_coverage': ab["coverage"],
-                                'hit_description': new_description,
-                            })
-
-                df = pd.DataFrame(rows)
-                df.to_csv(output_file, sep=';', index=False)
-
-
-        print(f"CSV archives created for {ref_organism} {prot_name} against {ooi}!")
+            if n_rows:
+                print(f"CSV archives created for {ref_organism} {prot_name} against {ooi}! ({n_rows} hits)")
+            else:
+                print(f"No hits passed the filters for {ref_organism} {prot_name} against {ooi}, empty CSV written.")

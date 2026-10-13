@@ -11,13 +11,13 @@ All outputs land in  <PAPER_PATH>/tables/
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 import data
+from thermo.reaction_gibbs import build_reaction_gibbs_table, load_compound_gibbs
 from logger import build_logger
 
 log = build_logger("tables")
@@ -45,57 +45,18 @@ def _target_organisms() -> list[str]:
 # Thermodynamics
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _load_delta_g(compound_key: str) -> float:
-    """
-    Return the Gibbs free energy (kcal/mol) for *compound_key*, or 0.0 if the
-    thermodynamics file is missing.
-    """
-    cpd        = data.compounds[compound_key]
-    pubchem_id = cpd["pubchem_id"]
-    path       = (
-        Path(data.COMPOUNDS_PATH)
-        / compound_key / "thermo"
-        / f"{compound_key}_{pubchem_id}.json"
-    )
-
-    try:
-        with path.open() as fh:
-            return json.load(fh).get("g_minus_eel_kcalpmol", 0.0)
-    except FileNotFoundError:
-        log.warning("Thermo data missing for %s (CID %s)", compound_key, pubchem_id)
-        return 0.0
-
-
-def build_compound_thermo_table() -> pd.DataFrame:
-    """One row per compound: name, PubChem ID, ΔG."""
+def build_compound_thermo_table(gibbs: pd.DataFrame) -> pd.DataFrame:
+    """One row per compound in the Gibbs CSV: name, PubChem ID, G and ORCA status."""
     rows: list[dict[str, Any]] = []
 
-    for key, cpd in data.compounds.items():
+    for key, cpd in gibbs.iterrows():
         rows.append({
-            "Compound":                   cpd["name"],
-            "PubChem ID":                 cpd["pubchem_id"],
-            "Gibbs Free Energy (kcal/mol)": _load_delta_g(key),
+            "Compound":                     data.compounds.get(key, {}).get("name", key),
+            "PubChem ID":                   cpd["cid"],
+            "Gibbs Free Energy (kcal/mol)": round(cpd["G_kcal"], 2),
+            "Status":                       cpd["status"],
+            "Imaginary Frequencies (cm-1)": cpd["imag_freqs_cm-1"],
         })
-
-    return pd.DataFrame(rows)
-
-
-def build_reaction_thermo_table(enzymes: dict) -> pd.DataFrame:
-    """One row per reaction: enzyme, equation, calculated ΔG, reference flag."""
-    rows: list[dict[str, Any]] = []
-
-    for enzyme_data in enzymes.values():
-        for rxn in enzyme_data["reactions"]:
-            g_substrates = sum(_load_delta_g(s) for s in rxn["substrates"])
-            g_products   = sum(_load_delta_g(p) for p in rxn["products"])
-            delta_g      = round(g_products - g_substrates, 2)
-
-            rows.append({
-                "Enzyme":                  enzyme_data["abbreviation"],
-                "Reaction":                f"{' + '.join(rxn['substrates'])} → {' + '.join(rxn['products'])}",
-                "Calculated ΔG (kcal/mol)": delta_g,
-                "Reference Reaction":       "Ref" if rxn["ref"] else "",
-            })
 
     return pd.DataFrame(rows)
 
@@ -164,8 +125,9 @@ def build_blast_table() -> pd.DataFrame:
 
 def main() -> None:
     log.info("Building thermodynamics tables…")
-    _save(build_compound_thermo_table(),          "thermodynamics_compounds_table.csv")
-    _save(build_reaction_thermo_table(data.proteins), "thermodynamics_table.csv")
+    gibbs = load_compound_gibbs()
+    _save(build_compound_thermo_table(gibbs),                "thermodynamics_compounds_table.csv")
+    _save(build_reaction_gibbs_table(data.proteins, gibbs), "thermodynamics_table.csv")
 
     log.info("Building BLAST table…")
     _save(build_blast_table(), "blast_table.csv")

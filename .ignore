@@ -1,0 +1,21 @@
+# graft's cards are gitignored but should stay greppable: ripgrep reads
+# .ignore before .gitignore, so this re-admits the tree to search only.
+!graft/
+graft/.cache/
+graft/.graph/
+
+# pathways/ is git-ignored (regenerable results) but agents need to search it:
+# re-admit it for ripgrep (Claude Code / opencode Grep & Glob), minus bulky
+# binary and raw-structure formats.
+!/pathways/
+/pathways/**/*.npz
+/pathways/**/*.pkl
+/pathways/**/*.gz
+/pathways/**/*.zip
+/pathways/**/*.a3m
+/pathways/**/*.pdbqt
+/pathways/**/*.cif
+/pathways/**/*.psq
+/pathways/**/*.pin
+/pathways/**/*.phr
+/pathways/**/*.m8

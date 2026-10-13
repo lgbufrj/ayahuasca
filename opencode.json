@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "graft": {
+      "type": "local",
+      "command": [
+        "{env:HOME}/.local/bin/node",
+        "{env:HOME}/.local/bin/graft",
+        "mcp"
+      ],
+      "enabled": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "graft": {
+      "command": "${HOME}/.local/bin/node",
+      "args": [
+        "${HOME}/.local/bin/graft",
+        "mcp"
+      ]
+    }
+  }
+}
